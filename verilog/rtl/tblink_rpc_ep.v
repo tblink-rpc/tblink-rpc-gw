@@ -7,105 +7,150 @@
 /**
  * Module: tblink_rpc_ep
  * 
- * TODO: Add module documentation
+ * Passthrough endpoint that manages routing traffic to/from TIP
  */
-module tblink_rpc_ep #(
-		parameter N_INTERFACE_INSTS=1
-		) (
-		input			clock,
+module tblink_rpc_ep #(parameter ADDR=1) (
+		input			uclock,
 		input			reset,
-		output			cclock,
-		`RV_TARGET_PORT(t_, 8),
-		`RV_INITIATOR_PORT(i_, 8),
-		input[7:0]		dat_i
+		input			hreq_i,			// Halt request input
+		output			hreq_o,			// Halt request output
+		`RV_TARGET_PORT(neti_, 8),		// Input from the network
+		`RV_INITIATOR_PORT(neto_, 8),	// Output to the network
+		`RV_INITIATOR_PORT(tipo_, 8),	// Output to the TIP
+		`RV_TARGET_PORT(tipi_, 8)		// Input from the TIP
 		);
 
-	reg			cclock_r;
-	assign cclock = cclock_r;
+	reg[3:0]			net_o_state;
+	reg[7:0]			neto_dat_r;
 	
-	always @(posedge clock or posedge reset) begin
-		if (reset) begin
-			cclock_r <= 0;
-		end else begin
-			if (cclock_en) begin
-				cclock_r <= ~cclock_r;
-			end
+	initial begin
+		if (ADDR == 0) begin
+			$display("%m Error: ADDR==0 is reserved");
+			$finish;
 		end
 	end
+
+	reg[3:0]			net_i_state;
+	reg[7:0]			net_i_dat_tmp;
+	reg[8:0]			net_i_count;
 	
-	reg[3:0]   	state;
-	reg[7:0] 	clk_count;
-	reg[7:0]	cmd;
-	reg[7:0]	adv_amt;
-	reg[7:0]	i_dat_r;
-	
-	assign cclock_en = (state == 2 && |clk_count);
-	
-	assign t_ready = (state == 0);
-	assign i_valid = (state == 3);
-	
-	reg[7:0]	rsp[1:0];
-	reg[1:0]	rsp_cnt;
-	reg[0:0]	rsp_idx;
-	assign i_dat = rsp[rsp_idx];
-	
-	always @(posedge clock or posedge reset) begin
+	// TODO: need to pipeline interactions to prevent 
+	// inserting a bubble
+		
+	/*
+	 * Network-in management process
+	 * - Accept data from network-in 
+	 * - Route it either to either the TIP or network
+	 * 
+	 */
+	always @(posedge uclock or posedge reset) begin
 		if (reset) begin
-			state <= 4'b0;
-			cmd <= {8{1'b0}};
-			clk_count <= {8{1'b0}};
-			i_dat_r <= {8{1'b0}};
-			rsp_cnt <= {2{1'b0}};
-			rsp_idx <= {1{1'b0}};
+			net_i_state <= 4'b0;
+			net_i_dat_tmp <= {8{1'b0}};
+			net_i_count <= {9{1'b0}};
 		end else begin
-			case (state) 
-				0: begin // Idle
-					// Wait for a command
-					if (t_valid) begin
-						cmd <= t_dat;
-						state <= 1;
-					end
-				end
-				
-				1: begin // Decode command
-					case (cmd[1:0]) 
-						2'b00: begin // Capture input data
-							rsp[0] <= 0; // Data response
-							rsp[1] <= dat_i; // Data
-							rsp_cnt <= 1;
-							rsp_idx <= 0;
-							state <= 3; // Send data
-						end
-						2'b01: begin // Advance for N clocks
-							clk_count <= cmd[7:2];
-							state <= 2;
-						end
-					endcase
-				end
-				2: begin // Advance for N cycles
-					if (clk_count == 0) begin
-						// Respond
-						rsp[0] <= 1; // Event response
-						rsp_cnt <= 0;
-						rsp_idx <= 0;
-						state <= 3; // Send response
-					end else begin
-						clk_count <= clk_count - 1;
-					end
-				end
-				
-				3: begin // Send response data
-					if (i_ready && i_valid) begin
-						if (rsp_idx == rsp_cnt) begin
-							state <= 0;
+			case (net_i_state)
+				4'b0000: begin // Receive header
+					if (neti_valid && neti_ready) begin
+						// Received the header. Based on the 
+						// destination, we either propagate to 
+						// the local TIP or to the next EP on
+						// the network.
+						if (neti_dat[6:0] == ADDR) begin
+							// This goes to the local TIP. The TIP
+							// doesn't care about the address header, so
+							// proceed by sending the 'count'
+							net_i_state <= 4'b1000;
 						end else begin
-							rsp_idx <= rsp_idx - 1;
+							// Direct to the net-out interface. We
+							// must preserve the header in this case.
+							net_i_dat_tmp <= neti_dat;
+							net_i_state <= 4'b0001;
 						end
+					end
+				end
+				
+				// Target: Network Output
+				4'b0001: begin // Network Output: Re-send header
+					if (neto_valid && neto_ready) begin
+						net_i_state <= 4'b0010;
+					end
+				end
+				4'b0010: begin // Network Output: Capture the count
+					if (neti_valid && neti_ready) begin
+						net_i_count <= (neti_dat + 1'b1);
+						net_i_dat_tmp <= neti_dat;
+						net_i_state <= 4'b0011;
+					end
+				end
+				4'b0011: begin // Network Output: Send data to network
+					if (neto_valid && neto_ready) begin
+						if (net_i_count == 9'b0) begin
+							// Packet complete. Back to beginning
+							net_i_state <= 4'b0000;
+						end else begin
+							// Capture next byte
+							net_i_state <= 4'b0100;
+						end
+						net_i_count <= net_i_count - 1'b1;
+					end
+				end
+				
+				4'b0100: begin // Network Output: Capture input data
+					if (neti_valid && neti_ready) begin
+						net_i_dat_tmp <= neti_dat;
+						net_i_state <= 4'b0011;
+					end
+				end
+				
+				// Target: TIP
+				
+				4'b1000: begin // TIP Output: Capture the count
+					if (neti_valid && neti_ready) begin
+						net_i_count <= (neti_dat + 1'b1);
+						net_i_dat_tmp <= neti_dat;
+						net_i_state <= 4'b1001;
+					end
+				end
+				
+				4'b1001: begin // TIP Output: Send data to TIP
+					if (neto_valid && neto_ready) begin
+						if (net_i_count == 9'b0) begin
+							// Packet complete
+							net_i_state <= 4'b0000;
+						end else begin
+							net_i_state <= 4'b1011;
+						end
+						net_i_count <= net_i_count - 1'b1;
+					end
+				end
+				
+				4'b1011: begin // TIP Output: Capture next input
+					if (neti_valid && neti_ready) begin
+						net_i_dat_tmp <= neti_dat;
+						net_i_state <= 4'b1001;
 					end
 				end
 			endcase
 		end
 	end
+	
+	assign neto_valid = (net_i_state == 4'b1001);
+	
+	/*
+	 * Network-out management process
+	 */
+	always @(posedge uclock or posedge reset) begin
+		if (reset) begin
+			net_o_state <= 4'b0;
+		end else begin
+			case (net_o_state)
+				4'b0000: begin // Wait for an incoming request
+				end
+			endcase
+		end
+	end
+
 endmodule
 
 

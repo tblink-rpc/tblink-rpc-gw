@@ -1,0 +1,20 @@
+CAPI=2:
+#****************************************************************************
+#* tblink-rpc-gw.core
+#****************************************************************************
+
+name: tblink-rpc::tblink-rpc-gw:0.1
+
+filesets:
+  rtl:
+    files:
+      - verilog/rtl/tblink_rpc_ctrl.v
+      - verilog/rtl/tblink_rpc_ep.v
+    file_type: verilogSource
+    depend:
+      - featherweight-ip::fwprotocol-defs
+
+targets:
+  default:
+    filesets:
+      - rtl

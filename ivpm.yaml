@@ -15,20 +15,14 @@ package:
     #*****************************************************************      
     - name: fwprotocol-defs
       url: http://github.com/featherweight-ip/fwprotocol-defs.git
+    - name: fwuart
+      url: http://github.com/featherweight-ip/fwuart.git
 
     #*****************************************************************      
     #* BFMs
     #*****************************************************************      
-    - name: pybfms
-      url: https://github.com/pybfms/pybfms.git
-    - name: pybfms-uart
-      url: https://github.com/pybfms/pybfms-uart.git
-    - name: pybfms-rv
-      url: https://github.com/pybfms/pybfms-rv.git
-    - name: pybfms-gpio
-      url: https://github.com/pybfms/pybfms-gpio.git   
-    - name: pyhvl-rpc
-      url: https://github.com/fvutils/pyhvl-rpc.git   
+    - name: tblink-bfms-rv
+      url: https://github.com/tblink-bfms/tblink-bfms-rv.git
       
     #*****************************************************************      
     #* Verification Infrastructure

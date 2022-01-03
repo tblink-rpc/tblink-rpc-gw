@@ -46,6 +46,12 @@ class Smoke(object):
         data = await self.u_rx_bfm.recv()
         print("Rx: 0x%02x" % data)
         
+        await self.u_tx_bfm.send(0x00) # Capture data
+        data = await self.u_rx_bfm.recv()
+        print("Rx: 0x%02x" % data)
+        data = await self.u_rx_bfm.recv()
+        print("Rx: 0x%02x" % data)
+        
         pass
     
 @cocotb.test()
@@ -55,4 +61,8 @@ async def entry(dut):
     await t.run()
 
     await cocotb.triggers.Timer(10, "us")
+       
+       
+       
+       
         
