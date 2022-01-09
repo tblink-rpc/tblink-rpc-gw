@@ -34,6 +34,15 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 	reg[7:0]			net_i_dat_tmp;
 	reg[8:0]			net_i_count;
 	
+	assign neti_ready = (
+			net_i_state == 4'b0000 ||
+			net_i_state == 4'b0010 ||
+			net_i_state == 4'b0100 ||
+			net_i_state == 4'b1000 ||
+			net_i_state == 4'b1011
+		);
+			
+	
 	// TODO: need to pipeline interactions to prevent 
 	// inserting a bubble
 		
