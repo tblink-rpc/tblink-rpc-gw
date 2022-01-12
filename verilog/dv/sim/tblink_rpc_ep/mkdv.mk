@@ -2,6 +2,10 @@ MKDV_MK:=$(abspath $(lastword $(MAKEFILE_LIST)))
 TEST_DIR:=$(dir $(MKDV_MK))
 include $(TEST_DIR)/../../common/prefix.mk
 MKDV_TOOL ?= icarus
+MKDV_TIMEOUT ?= 1ms
+
+VLSIM_CLKSPEC += clock=10ns
+VLSIM_OPTIONS += -Wno-fatal
 
 PYTHON_PATHS := $(shell $(PYTHON) -m mkdv files -t pythonPath tblink-rpc-gw:sim:tblink-rpc-ep-tb -f python)
 MKDV_PYTHONPATH += $(PYTHON_PATHS)

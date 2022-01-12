@@ -22,6 +22,7 @@ module tblink_rpc_ctrl #(
 
 	reg			cclock_r;
 	assign cclock = cclock_r;
+	wire cclock_en;
 	
 	always @(posedge clock or posedge reset) begin
 		if (reset) begin

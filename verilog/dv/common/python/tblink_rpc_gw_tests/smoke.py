@@ -8,57 +8,34 @@ import tblink_rpc_cocotb
 from rv_bfms.rv_initiator_bfm import RvInitiatorBfm
 from rv_bfms.rv_target_bfm import RvTargetBfm
 import cocotb
+from tblink_rpc.lib.fifo import Fifo
+import tblink_rpc
 
 class Smoke(object):
     
     async def init(self):
         await tblink_rpc_cocotb.init()
+        
+        self.fifo_net_o = Fifo()
+        
         self.u_net_i : RvInitiatorBfm = tblink_rpc_cocotb.find_ifinst(".*u_net_i")
-        self.u_net_o : RvTargetBfm = tblink_rpc_cocotb.find_ifinst(".*u_net_i")
+        self.u_net_o : RvTargetBfm = tblink_rpc_cocotb.find_ifinst(".*u_net_o")
+        self.u_net_o.set_req_f(lambda data : self.fifo_net_o.try_put(data))
+        
+        self.u_tip_o : RvTargetBfm = tblink_rpc_cocotb.find_ifinst(".*u_tip_o")
+        self.u_tip_i : RvInitiatorBfm = tblink_rpc_cocotb.find_ifinst(".*u_tip_i")
         
     async def run(self):
-        await self.u_net_i.send(0x01) # Destination
-        await self.u_net_i.send(0x01) # Size
-        await self.u_net_i.send(0x55) # Data
+        
+        t1 = tblink_rpc.start_soon(self.u_tip_i.send([0x02,0x00,0xaa]))
+        t2 = tblink_rpc.start_soon(self.u_net_i.send([0x03,0x00,0x55]))
+        
+        await tblink_rpc.gather(t1, t2)
+        
+#        tblink_rpc.
         
         await cocotb.triggers.Timer(10, "us")
-        
-        # await self.u_tx_bfm.send(0x00) # Capture data
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        #
-        # # Now, advance for 1 cycle
-        # await self.u_tx_bfm.send((2 << 2) | 1) 
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        #
-        # await self.u_tx_bfm.send(0x00) # Capture data
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        #
-        # # Now, advance for 1 cycle
-        # await self.u_tx_bfm.send((40 << 2) | 1) 
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        #
-        # await self.u_tx_bfm.send(0x00) # Capture data
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        #
-        # await self.u_tx_bfm.send(0x00) # Capture data
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        # data = await self.u_rx_bfm.recv()
-        # print("Rx: 0x%02x" % data)
-        
-        pass
-    
+
 @cocotb.test()
 async def entry(dut):
     t = Smoke()

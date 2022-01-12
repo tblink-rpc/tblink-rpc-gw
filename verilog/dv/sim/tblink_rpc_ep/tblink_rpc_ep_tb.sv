@@ -32,7 +32,7 @@ module tblink_rpc_ep_tb(input clock);
 	assign clock = clock_r;
 `endif
 	
-	wire uclock;
+	wire uclock /* verilator public */;
 	assign uclock = clock;
 	
 	reg      reset = 0;
