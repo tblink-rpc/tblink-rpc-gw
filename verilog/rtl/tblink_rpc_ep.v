@@ -3,40 +3,6 @@
  ****************************************************************************/
 `include "rv_macros.svh"
 
-module rv_buffer #(parameter WIDTH=8)(
-		input			clock,
-		input			reset,
-		`RV_TARGET_PORT(i_, WIDTH),
-		`RV_INITIATOR_PORT(o_, WIDTH)
-		);
-	reg[WIDTH-1:0]			dat;
-	reg						dat_v;
-
-	// Accept new data if we're not currently holding any
-	// or if the output is accepting data in this cycle
-	assign i_ready = (dat_v == 1'b0 || (o_valid & o_ready));
-	assign o_valid = dat_v;
-	assign o_dat = dat;
-	
-	always @(posedge clock) begin
-		if (reset) begin
-			dat <= {WIDTH{1'b0}};
-			dat_v <= 1'b0;
-		end else begin
-			if (i_valid && i_ready) begin
-				dat <= i_dat;
-			end
-		
-			if (i_valid && i_ready) begin
-				dat_v <= 1'b1;
-			end else if (o_valid && o_ready) begin
-				dat_v <= 1'b0;
-			end
-		end
-	end
-	
-endmodule
-  
 /**
  * Module: tblink_rpc_ep
  * 
@@ -61,13 +27,12 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 	end
 
 	reg[3:0]			net_i_state;
-	reg[7:0]			net_i_dat_tmp;
 	reg[8:0]			net_i_count;
 	
 	// TODO: need to pipeline interactions to prevent 
 	// inserting a bubble
 	
-	`RV_WIRES(neti2neti_b_, 8);
+	`RV_WIRES(neti2neto_b_, 8);
 	`RV_WIRES(neti_b2neto_, 8);
 	`RV_WIRES(neti2tipo_b_, 8);
 	
@@ -78,26 +43,26 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 	assign tipi_ready = tipi2neto_b_ready;
 	assign tipi2neto_b_valid = tipi_valid;
 	
-	rv_buffer #(
+	fw_rv_buffer #(
 		.WIDTH    (8   )
-		) u_neti2neti_b (
+		) u_neti2neto_b (
 		.clock    (uclock  ), 
 		.reset    (reset   ), 
-		`RV_CONNECT(i_, neti2neti_b_),
+		`RV_CONNECT(i_, neti2neto_b_),
 		`RV_CONNECT(o_, neti_b2neto_)
 		);
 	
-	assign neti2neti_b_dat = neti_dat;
+	assign neti2neto_b_dat = neti_dat;
 	
 	assign neti_ready = (
 			(net_i_state == 4'b0000) ||
- 			(net_i_state == 4'b0001 && neti2neti_b_ready) ||
- 			(net_i_state == 4'b0010 && neti2neti_b_ready) ||
- 			(net_i_state == 4'b0011 && neti2neti_b_ready) ||
+ 			(net_i_state == 4'b0001 && neti2neto_b_ready) ||
+ 			(net_i_state == 4'b0010 && neti2neto_b_ready) ||
+ 			(net_i_state == 4'b0011 && neti2neto_b_ready) ||
  			((net_i_state == 4'b1000 ||
  				net_i_state == 4'b1001) && neti2tipo_b_ready)
 		);
-	assign neti2neti_b_valid = (
+	assign neti2neto_b_valid = (
 			((net_i_state == 4'b0000 && neti_dat[6:0] != ADDR) ||
 			(net_i_state == 4'b0010) ||
 			(net_i_state == 4'b0011)
@@ -106,7 +71,7 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 	
 	`RV_WIRES(tipo_b2tipo_, 8);
 	
-	rv_buffer #(
+	fw_rv_buffer #(
 		.WIDTH    (8   )
 		) u_neti2tipo_b (
 		.clock    (uclock  ), 
@@ -122,7 +87,7 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 		);
 	assign neti2tipo_b_dat = neti_dat;
 
-	rv_buffer #(
+	fw_rv_buffer #(
 		.WIDTH    (8   )
 		) u_tipi2neto_b (
 		.clock    (uclock  ), 
@@ -140,7 +105,6 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 	always @(posedge uclock or posedge reset) begin
 		if (reset) begin
 			net_i_state <= 4'b0;
-			net_i_dat_tmp <= {8{1'b0}};
 			net_i_count <= {9{1'b0}};
 		end else begin
 			case (net_i_state)
@@ -221,7 +185,6 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 		end else begin
 			case (net_o_state)
 				4'b0000: begin // Wait for an incoming request
-					// TODO: Fixed priority? Round-robin?
 					if (neti_b2neto_valid) begin
 						net_o_state <= 4'b0001;
 					end else if (tipi_b2neto_valid) begin
@@ -258,8 +221,8 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 						net_o_count <= neto_dat;
 					end
 				end
-				4'b0111: begin // tipi->neto payload
-					if (neti_b2neto_valid && neti_b2neto_ready) begin
+				4'b0110: begin // tipi->neto payload
+					if (tipi_b2neto_valid && tipi_b2neto_ready) begin
 						if (net_o_count == 0) begin
 							net_o_state <= 4'b0000;
 						end
@@ -279,7 +242,7 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 	assign tipi_b2neto_ready = (
 			(net_o_state[2] == 1'b1 & neto_ready)
 		);
-	assign neto_dat = (net_o_state[2])?tipi2neto_b_dat:neti_b2neto_dat;
+	assign neto_dat = (net_o_state[2])?tipi_b2neto_dat:neti_b2neto_dat;
 	
 endmodule
 

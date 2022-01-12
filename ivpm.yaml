@@ -17,6 +17,8 @@ package:
       url: http://github.com/featherweight-ip/fwprotocol-defs.git
     - name: fwuart
       url: http://github.com/featherweight-ip/fwuart.git
+    - name: fw-rv-comps
+      url: http://github.com/featherweight-ip/fw-rv-comps.git
 
     #*****************************************************************      
     #* BFMs
