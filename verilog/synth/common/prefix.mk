@@ -1,0 +1,6 @@
+TBLINK_RPC_GW_VERILOG_COMMONDIR:=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+TBLINK_RPC_GWDIR:=$(abspath $(TBLINK_RPC_GW_VERILOG_COMMONDIR)/../../..)
+PACKAGES_DIR:=$(TBLINK_RPC_GWDIR)/packages
+PYTHON:=$(PACKAGES_DIR)/python/bin/python3
+
+

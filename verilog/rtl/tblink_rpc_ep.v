@@ -19,12 +19,14 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 		`RV_TARGET_PORT(tipi_, 8)		// Input from the TIP
 		);
 
+	/*
 	initial begin
 		if (ADDR == 0) begin
 			$display("%m Error: ADDR==0 is reserved");
 			$finish;
 		end
 	end
+	 */
 
 	reg[3:0]			net_i_state;
 	reg[8:0]			net_i_count;
@@ -243,6 +245,8 @@ module tblink_rpc_ep #(parameter ADDR=1) (
 			(net_o_state[2] == 1'b1 & neto_ready)
 		);
 	assign neto_dat = (net_o_state[2])?tipi_b2neto_dat:neti_b2neto_dat;
+	
+	assign hreq_o = (hreq_i | (|net_i_state) | (|net_o_state));
 	
 endmodule
 

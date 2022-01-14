@@ -9,22 +9,68 @@
  * 
  * TODO: Add module documentation
  */
-module tblink_rpc_ctrl #(
-		parameter N_INTERFACE_INSTS=1
-		) (
-		input			clock,
+module tblink_rpc_ctrl(
+		input			uclock,
 		input			reset,
 		output			cclock,
+		
 		`RV_TARGET_PORT(t_, 8),
 		`RV_INITIATOR_PORT(i_, 8),
-		input[7:0]		dat_i
+		
+		`RV_TARGET_PORT(neti_, 8),
+		`RV_INITIATOR_PORT(neto_, 8)
+		);
+	
+	wire hreq_i, hreq_o;
+	
+	`RV_WIRES(t2demux_, 8);
+	`RV_WIRES(demux2local_, 8);
+	`RV_WIRES(demux2ntipi_, 8); // Output to the network
+
+	tblink_rpc_rvdemux #(
+		.ADDR      (0     )
+		) u_tdemux (
+		.clock     (uclock   ), 
+		.reset     (reset    ), 
+		`RV_CONNECT(i_, t_),
+		`RV_CONNECT(oa_, demux2local_),
+		`RV_CONNECT(op_, demux2ntipi_)
+		);
+	
+	assign demux2local_ready = 1'b0;
+	
+	`RV_WIRES(ntipo2mux_, 8);
+	`RV_WIRES(local2mux_, 8);
+	
+	tblink_rpc_rvmux u_imux (
+		.clock     (uclock   ), 
+		.reset     (reset    ), 
+		`RV_CONNECT(i0_, ntipo2mux_),
+		`RV_CONNECT(i1_, local2mux_),
+		`RV_CONNECT(o_, i_)
+		);
+	
+	/**
+	 * EP connected to host interface
+	 */
+	tblink_rpc_ep #(
+		.ADDR        (0       )
+		) u_ep (
+		.uclock      (uclock     ), 
+		.reset       (reset      ), 
+		.hreq_i      (hreq_i     ), 
+		.hreq_o      (hreq_o     ), 
+		`RV_CONNECT(neti_, neti_),
+		`RV_CONNECT(neto_, neto_),
+		`RV_CONNECT(tipi_, demux2ntipi_),
+		`RV_CONNECT(tipo_, ntipo2mux_)
 		);
 
 	reg			cclock_r;
 	assign cclock = cclock_r;
 	wire cclock_en;
-	
-	always @(posedge clock or posedge reset) begin
+
+	always @(posedge uclock or posedge reset) begin
 		if (reset) begin
 			cclock_r <= 0;
 		end else begin
@@ -34,6 +80,9 @@ module tblink_rpc_ctrl #(
 		end
 	end
 	
+	assign cclock_en = 1'b1;
+	
+`ifdef UNDEFINED
 	reg[3:0]   	state;
 	reg[7:0] 	clk_count;
 	reg[7:0]	cmd;
@@ -41,7 +90,7 @@ module tblink_rpc_ctrl #(
 	reg[7:0]	i_dat_r;
 	
 	assign cclock_en = (state == 2 && |clk_count);
-	
+
 	assign t_ready = (state == 0);
 	assign i_valid = (state == 3);
 	
@@ -50,7 +99,7 @@ module tblink_rpc_ctrl #(
 	reg[0:0]	rsp_idx;
 	assign i_dat = rsp[rsp_idx];
 	
-	always @(posedge clock or posedge reset) begin
+	always @(posedge uclock or posedge reset) begin
 		if (reset) begin
 			state <= 4'b0;
 			cmd <= {8{1'b0}};
@@ -72,7 +121,7 @@ module tblink_rpc_ctrl #(
 					case (cmd[1:0]) 
 						2'b00: begin // Capture input data
 							rsp[0] <= 0; // Data response
-							rsp[1] <= dat_i; // Data
+//							rsp[1] <= dat_i; // Data
 							rsp_cnt <= 1;
 							rsp_idx <= 0;
 							state <= 3; // Send data
@@ -107,6 +156,8 @@ module tblink_rpc_ctrl #(
 			endcase
 		end
 	end
+`endif
+	
 endmodule
 
 

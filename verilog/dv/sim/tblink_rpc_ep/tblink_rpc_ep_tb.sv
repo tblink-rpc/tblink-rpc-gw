@@ -86,6 +86,9 @@ module tblink_rpc_ep_tb(input clock);
 		`RV_CONNECT(i_, bfm2tipi_)
 		);
 	
+	wire hreq_i, hreq_o;
+	assign hreq_i = 0;
+	
 	tblink_rpc_ep #(
 		.ADDR        (1       )
 		) u_dut (

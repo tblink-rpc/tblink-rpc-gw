@@ -10,6 +10,8 @@ filesets:
     files:
       - verilog/rtl/tblink_rpc_ctrl.v
       - verilog/rtl/tblink_rpc_ep.v
+      - verilog/rtl/tblink_rpc_rvdemux.v
+      - verilog/rtl/tblink_rpc_rvmux.v
     file_type: verilogSource
     depend:
       - featherweight-ip::fwprotocol-defs
