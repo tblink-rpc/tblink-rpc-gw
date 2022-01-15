@@ -36,7 +36,6 @@ module tblink_rpc_ctrl(
 		`RV_CONNECT(op_, demux2ntipi_)
 		);
 	
-	assign demux2local_ready = 1'b0;
 	
 	`RV_WIRES(ntipo2mux_, 8);
 	`RV_WIRES(local2mux_, 8);
@@ -89,7 +88,11 @@ module tblink_rpc_ctrl(
 				cclock_r <= ~cclock_r;
 				cclock_div_cnt <= {32{1'b0}};
 			end else begin
-				cclock_div_cnt <= cclock_div_cnt + 1'b1;
+				if (cclock_en_r) begin
+					cclock_div_cnt <= cclock_div_cnt + 1'b1;
+				end else begin
+					cclock_div_cnt <= {32{1'b0}};
+				end
 			end
 		end
 	end
@@ -104,10 +107,16 @@ module tblink_rpc_ctrl(
 	reg[3:0]		rsp_buf_cnt;
 	
 	wire req_buf_en;
-	assign demux2local_ready = (~local_state[3]);
-	assign req_buf_en = (!local_state[3] & demux2local_ready & demux2local_valid);
+//	assign demux2local_ready = (~local_state[3]);
+	assign req_buf_en = (
+			(!local_state[3] & demux2local_ready & demux2local_valid) ||
+			(local_state == 4'b0011));
+	assign local2mux_valid = (local_state == 4'b1000);
+	assign local2mux_dat = rsp_buf[0];
 	
-	integer req_buf_i;
+	integer req_buf_i, rsp_buf_i;
+	
+	assign demux2local_ready = (local_state != 4'b1000);
 	
 	always @(posedge uclock or posedge reset) begin
 		if (reset) begin
@@ -116,25 +125,20 @@ module tblink_rpc_ctrl(
 			req_msg_size <= 3'b000;
 			cclock_div <= {32{1'b0}};
 			cclock_en_r <= 1'b0;
-			
-			/*
-			for (req_buf_i=0; req_buf_i<6; req_buf_i=req_buf_i+1) begin
-				req_buf[i] <= req_buf[i-1];
-			end
-			 */
+			rsp_buf_cnt <= 4'b0000;
 		end else begin
 			// Shift in a new byte when enabled
 			if (req_buf_en) begin
-				for (req_buf_i=5; req_buf_i>0; req_buf_i=req_buf_i-1) begin
-					req_buf[req_buf_i] <= req_buf[req_buf_i-1];
+				for (req_buf_i=0; req_buf_i<5; req_buf_i=req_buf_i+1) begin
+					req_buf[req_buf_i] <= req_buf[req_buf_i+1];
 				end
-				req_buf[0] <= demux2local_dat;
+				req_buf[5] <= demux2local_dat;
 			end
 			case (local_state)
 				4'b0000: begin
 					if (demux2local_ready && demux2local_valid) begin
 						// Receive header
-						req_buf_cnt <= 6;
+						req_buf_cnt <= 5;
 						local_state <= 4'b0001;
 					end
 				end
@@ -164,7 +168,7 @@ module tblink_rpc_ctrl(
 					req_buf_cnt <= req_buf_cnt-1;
 				end
 				4'b0100: begin // Handle the command
-					rsp_buf[0] <= 8'h00; // DS
+					rsp_buf[0] <= 8'h00; // DST
 					// rsp_buf[1]: total payload size
 					rsp_buf[2] <= 8'h01; // RSP
 					rsp_buf[3] <= req_buf[1]; // ID
@@ -187,14 +191,30 @@ module tblink_rpc_ctrl(
 						3'b011: begin // Release
 							// Re-enable clock
 							cclock_en_r <= 1'b1;
-							rsp_buf[1] <= 8'd00; // Total payload size-1
+							rsp_buf[1] <= 8'd01; // Total payload size-1
+							rsp_buf_cnt <= 3;
+						end
+						3'b100: begin // SetDivisor
+							cclock_div[7:0] <= req_buf[2];
+							cclock_div[15:8] <= req_buf[3];
+							cclock_div[23:16] <= req_buf[4];
+							cclock_div[31:24] <= req_buf[5];
+							rsp_buf[1] <= 8'd01; // Total payload size-1
+							rsp_buf_cnt <= 3;
 						end
 					endcase
+					for (rsp_buf_i=0; rsp_buf_i<6; rsp_buf_i=rsp_buf_i+1) begin
+						$display("rsp_buf[%0d] = 'h%02h", rsp_buf_i, rsp_buf[rsp_buf_i]);
+					end
 					local_state <= 4'b1000; 
 				end
 				4'b1000: begin // Send response
-					if (1) begin
-						if (!(|rsp_buf_cnt)) begin
+					if (local2mux_ready && local2mux_valid) begin
+						// Shift the message
+						for (rsp_buf_i=0; rsp_buf_i<11; rsp_buf_i=rsp_buf_i+1) begin
+							rsp_buf[rsp_buf_i] <= rsp_buf[rsp_buf_i+1];
+						end
+						if (rsp_buf_cnt == 4'b0000) begin
 							if (cclock_en_r) begin
 								local_state <= 4'b1001;
 							end else begin

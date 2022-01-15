@@ -7,6 +7,7 @@ DV_MK:=$(shell PATH=$(PACKAGES_DIR)/python/bin:$(PATH) python3 -m mkdv mkfile)
 ifneq (1,$(RULES))
 
 MKDV_PYTHONPATH += $(TBLINK_RPC_GW_VERILOG_COMMONDIR)/python
+MKDV_PYTHONPATH += $(TBLINK_RPC_GWDIR)/python
 
 include $(DV_MK)
 else # Rules

@@ -9,8 +9,8 @@ VLSIM_OPTIONS += -Wno-fatal
 
 TB_VLNV := tblink-rpc-gw:sim:tblink-rpc-ctrl-tb
 
-PYTHON_PATHS := $(shell $(PYTHON) -m mkdv files -t pythonPath $(TB_VLNV) -f python)
-MKDV_PYTHONPATH += $(PYTHON_PATHS)
+#PYTHON_PATHS := $(shell $(PYTHON) -m mkdv files -t pythonPath $(TB_VLNV) -f python)
+#MKDV_PYTHONPATH += $(PYTHON_PATHS)
 ifeq (icarus,$(MKDV_TOOL))
   VL_SRCS := $(shell $(PYTHON) -m mkdv files -t verilogSource -t systemVerilogSource $(TB_VLNV) -f vl)
   VL_INCS := $(shell $(PYTHON) -m mkdv files -i -t verilogSource -t systemVerilogSource $(TB_VLNV) -f vl)
