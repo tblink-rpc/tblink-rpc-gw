@@ -1,0 +1,18 @@
+CAPI=2:
+
+name: tblink-rpc-gw:sim:tblink-rpc-cmdproc-tb:0.1
+
+filesets:
+  rtl:
+    files:
+      - tblink_rpc_cmdproc_tb.sv
+    file_type: systemVerilogSource
+    depend:
+      - tblink-rpc::tblink-rpc-gw
+      - tblink-bfms::rv
+    
+targets:
+  default:
+    filesets:
+      - rtl
+

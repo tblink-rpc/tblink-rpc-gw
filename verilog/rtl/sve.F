@@ -3,4 +3,5 @@
 ./tblink_rpc_ctrl.v
 ./tblink_rpc_rvdemux.v
 ./tblink_rpc_rvmux.v
+./tblink_rpc_cmdproc.v
 
