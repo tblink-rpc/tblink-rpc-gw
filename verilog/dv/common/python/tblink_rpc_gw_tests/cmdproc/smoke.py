@@ -12,7 +12,9 @@ from tblink_rpc_gw_tests.cmdproc.test_base import TestBase
 class SmokeTest(TestBase):
 
     async def run(self):
+        print("--> Run")
         await super().run()
+        print("<-- Run")
         
 
 @cocotb.test()
@@ -22,12 +24,3 @@ async def entry(dut):
     await t.init()
     await t.run()
     
-    print("Hello World!")
-    print("--> init")
-    await tblink_rpc.cocotb_compat.init()
-    
-    for bfm in tblink_rpc.cocotb_compat.ifinsts():
-        print("Bfm: %s" % bfm.inst_name())
-        
-    print("<-- init")
-    pass

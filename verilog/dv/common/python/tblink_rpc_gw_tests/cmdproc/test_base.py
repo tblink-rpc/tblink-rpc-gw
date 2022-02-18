@@ -5,11 +5,12 @@ Created on Feb 16, 2022
 '''
 import tblink_rpc
 import rv_bfms
+from rv_bfms.rv_initiator_bfm import RvInitiatorBfm
 
 class TestBase(object):
     
     def __init__(self):
-        self.net_i = None
+        self.net_i : RvInitiatorBfm = None
         pass
     
     async def init(self):

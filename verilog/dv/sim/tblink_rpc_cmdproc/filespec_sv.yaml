@@ -1,0 +1,19 @@
+
+filespec:
+  - vlnv: tblink-rpc-gw:sim:tblink-rpc-cmdproc-tb
+    out:
+      - path: pythonpaths.txt
+        type: pythonPath
+        flags: python
+      - path: vl_srcs.txt
+        type: 
+          - verilogSource
+          - systemVerilogSource
+        flags: sv
+      - path: vl_incs.txt
+        type:
+          - verilogSource
+          - systemVerilogSource
+        flags: sv
+        include: True
+
