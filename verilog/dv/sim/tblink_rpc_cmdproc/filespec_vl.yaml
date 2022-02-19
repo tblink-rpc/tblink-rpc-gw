@@ -2,15 +2,15 @@
 filespec:
   - vlnv: tblink-rpc-gw:sim:tblink-rpc-cmdproc-tb
     out:
-      - path: pythonpaths.txt
+      - name: PYTHON_PATHS
         type: pythonPath
         flags: python
-      - path: vl_srcs.txt
+      - name: MKDV_VL_SRCS
         type: 
           - verilogSource
           - systemVerilogSource
         flags: vl
-      - path: vl_incs.txt
+      - name: MKDV_VL_INCDIRS
         type:
           - verilogSource
           - systemVerilogSource

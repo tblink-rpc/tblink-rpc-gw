@@ -34,6 +34,7 @@ module tblink_rpc_cmdproc_tb(input clock);
 	
 	wire uclock /* verilator public */;
 	assign uclock = clock;
+	reg cclock = 0;
 	
 	reg      reset = 0;
 	reg[5:0] reset_cnt = 0;
@@ -47,6 +48,10 @@ module tblink_rpc_cmdproc_tb(input clock);
 			end
 			reset_cnt <= reset_cnt + 1;
 		end
+	end
+	
+	always @(posedge clock) begin
+		cclock <= ~cclock;
 	end
 	
 	`RV_WIRES(bfm2neti_, 8);
@@ -69,26 +74,7 @@ module tblink_rpc_cmdproc_tb(input clock);
 		);
 	
 	`RV_WIRES(tipo2proc_, 8);
-	/*
-	rv_target_bfm #(
-		.WIDTH    (8   )
-		) u_tip_o (
-		.clock    (clock   ), 
-		.reset    (reset   ), 
-		`RV_CONNECT(t_, tipo2bfm_)
-		);
-	 */
-	
 	`RV_WIRES(proc2tipi_, 8);
-	/*
-	rv_initiator_bfm #(
-		.WIDTH    (8   )
-		) u_tip_i (
-		.clock    (clock   ), 
-		.reset    (reset   ), 
-		`RV_CONNECT(i_, bfm2tipi_)
-		);
-	 */
 	
 	wire hreq_i, hreq_o;
 	assign hreq_i = 0;
@@ -126,6 +112,8 @@ module tblink_rpc_cmdproc_tb(input clock);
 	reg[(CMD_IN_RSP_SZ*8)-1:0]			cmd_in_rsp;
 	wire[7:0]							cmd_in_rsp_sz;
 	
+	assign cmd_in_rsp_sz = {8{1'b0}};
+	
 	
 	tblink_rpc_cmdproc #(
 		.CMD_IN_PARAMS_SZ  (CMD_IN_PARAMS_SZ ), 
@@ -135,13 +123,13 @@ module tblink_rpc_cmdproc_tb(input clock);
 		) u_cmdproc (
 		.uclock            (uclock           ), 
 		.reset             (reset            ), 
-		`RV_CONNECT(tipo_, tipo2proc),
-		`RV_CONNECT(tipi_, proc2tipi),
+		`RV_CONNECT(tipo_, tipo2proc_),
+		`RV_CONNECT(tipi_, proc2tipi_),
 		.cmd_in            (cmd_in           ), 
 		.cmd_in_sz         (cmd_in_sz        ), 
 		.cmd_in_params     (cmd_in_params    ), 
 		.cmd_in_put_i      (cmd_in_put_i     ), 
-		.cmd_in_get_i      (cmd_in_get_i     ), 
+		.cmd_in_get_i      (cmd_in_get_i_r   ), 
 		.cmd_in_rsp        (cmd_in_rsp       ), 
 		.cmd_in_rsp_sz     (cmd_in_rsp_sz    ) 
 		/*
@@ -153,6 +141,18 @@ module tblink_rpc_cmdproc_tb(input clock);
 		.cmd_out_rsp       (cmd_out_rsp      )
 		 */
 		);
+	
+	wire cmd_in_valid = (cmd_in_put_i != cmd_in_get_i_r);
+	
+	always @(posedge cclock or posedge reset) begin
+		if (reset) begin
+		end else begin
+			if (cmd_in_put_i != cmd_in_get_i_r) begin
+				$display("COMMAND");
+				cmd_in_get_i_r <= ~cmd_in_get_i_r;
+			end 
+		end
+	end
 
 endmodule
 

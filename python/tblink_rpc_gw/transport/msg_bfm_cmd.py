@@ -7,10 +7,10 @@ from tblink_rpc_gw.transport.msg_base import MsgBase
 
 class MsgBfmCmd(MsgBase):
     
-    def __init__(self, dst, cmd, id):
+    def __init__(self, dst, id, cmd):
         super().__init__(dst)
-        self.cmd = cmd
         self.id = id
+        self.cmd = cmd
         
     def pack(self):
         ret = []

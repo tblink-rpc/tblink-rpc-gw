@@ -8,23 +8,14 @@ VLSIM_CLKSPEC += clock=10ns
 VLSIM_OPTIONS += -Wno-fatal
 
 ifeq (icarus,$(MKDV_TOOL))
-  RUN := $(shell $(PYTHON) -m mkdv files $(TEST_DIR)/filespec_vl.yaml)
-  VL_SRCS := $(shell cat $(TEST_DIR)/vl_srcs.txt)
-  VL_INCS := $(shell cat $(TEST_DIR)/vl_incs.txt)
   TBLINK_RPC_PLUGIN := $(shell $(PYTHON) -m tblink_rpc_hdl simplugin vpi)
   VPI_LIBS += $(TBLINK_RPC_PLUGIN)
 else
-  RUN := $(shell $(PYTHON) -m mkdv files $(TEST_DIR)/filespec_sv.yaml)
-  VL_SRCS := $(shell cat $(TEST_DIR)/vl_srcs.txt)
-  VL_INCS := $(shell cat $(TEST_DIR)/vl_incs.txt)
   TBLINK_RPC_PLUGIN := $(shell $(PYTHON) -m tblink_rpc_hdl simplugin dpi)
   DPI_LIBS += $(TBLINK_RPC_PLUGIN)
 endif
-PYTHON_PATHS := $(shell cat pythonpaths.txt)
 MKDV_PYTHONPATH += $(PYTHON_PATHS)
 
-MKDV_VL_SRCS    += $(VL_SRCS)
-MKDV_VL_INCDIRS += $(VL_INCS)
 TOP_MODULE = tblink_rpc_cmdproc_tb
 
 #MKDV_PLUGINS += cocotb 
@@ -38,5 +29,17 @@ include $(TEST_DIR)/../../common/defs_rules.mk
 RULES := 1
 
 include $(TEST_DIR)/../../common/defs_rules.mk
+include $(MKDV_CACHEDIR)/files.mk
+
+$(MKDV_CACHEDIR)/files.mk :
+	mkdir -p $(MKDV_CACHEDIR)
+ifeq (icarus,$(MKDV_TOOL))
+	$(PYTHON) -m mkdv filespec $(TEST_DIR)/filespec_vl.yaml \
+		-t mk -o $@
+else
+	$(PYTHON) -m mkdv filespec $(TEST_DIR)/filespec_sv.yaml \
+		-t mk -o $@
+endif
+
 
 

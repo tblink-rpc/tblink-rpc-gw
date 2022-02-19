@@ -29,7 +29,7 @@ module tblink_rpc_cmdproc #(
 		
 		input[7:0]							cmd_out,
 		input[7:0]							cmd_out_sz,
-		input[(CMD_OUT_PARAMS_SZ*8)-1:0]		cmd_out_params,
+		input[(CMD_OUT_PARAMS_SZ*8)-1:0]	cmd_out_params,
 		input								cmd_out_put_i,
 		output								cmd_out_get_i,
 		output[(CMD_OUT_RSP_SZ*8)-1:0]		cmd_out_rsp
@@ -47,25 +47,37 @@ module tblink_rpc_cmdproc #(
 	assign cmd_in_sz = cmd_in_sz_r;
 	assign cmd_in_params = cmd_in_params_r;
 	assign cmd_in_put_i = cmd_in_put_i_r;
-
+	
 	reg[3:0]		tipo_state;
 	reg[7:0]		tipo_rsize;
 	reg[7:0]		tipo_id;
 
-	localparam TIPO_COUNT    = 4'b0000;
-	localparam TIPO_CMD      = 4'b0010;
-	localparam TIPO_ID_REQ   = 4'b0001;
-	localparam TIPO_DAT_REQ  = 4'b0011;
-	localparam TIPO_EXEC_REQ = 4'b0011;
-	localparam TIPO_ID_RSP   = 4'b0001;
-	localparam TIPO_DAT_RSP  = 4'b0011;
-	localparam TIPO_EXEC_RSP = 4'b0011;
-	localparam TIPO_WAIT_RSP_ACK = 4'b0011;
+	localparam TIPO_COUNT    		= 4'b0000;
+	localparam TIPO_CMD      		= (TIPO_COUNT+1'b1);
+	localparam TIPO_ID_REQ   		= (TIPO_CMD+1'b1);
+	localparam TIPO_DAT_REQ  		= (TIPO_ID_REQ+1'b1);
+	localparam TIPO_SHL_REQ  		= (TIPO_DAT_REQ+1'b1);		// 4
+	localparam TIPO_EXEC_REQ 		= (TIPO_SHL_REQ+1'b1);
+	localparam TIPO_ID_RSP   		= (TIPO_EXEC_REQ+1'b1);
+	localparam TIPO_DAT_RSP  		= (TIPO_ID_RSP+1'b1);
+	localparam TIPO_EXEC_RSP 		= (TIPO_DAT_RSP+1'b1);		// 8
+	localparam TIPO_WAIT_RSP_ACK 	= (TIPO_EXEC_RSP+1'b1);
 	
 	wire tipo_rsp_valid;
 	wire tipo_rsp_ready;
+
+	reg[7:0] tipo_count;
+	reg[7:0] tipo_rcount;
 	
-	reg[7:0] rcount;
+	assign tipo_ready = (
+			tipo_state == TIPO_COUNT ||
+			tipo_state == TIPO_CMD ||
+			tipo_state == TIPO_ID_REQ ||
+			tipo_state == TIPO_DAT_REQ
+		);
+	assign tipo_rsp_valid = (
+			tipo_state == TIPO_WAIT_RSP_ACK
+		);
 
 	// TIPO State Machine
 	// - Receives both cmd-in-req and cmd-out-rsp
@@ -82,10 +94,8 @@ module tblink_rpc_cmdproc #(
 			case (tipo_state)
 				TIPO_COUNT: begin // Count
 					if (tipo_valid && tipo_ready) begin
-						/*
-						count <= tipo_dat;
-						rcount <= tipo_dat;
-						 */
+						tipo_count <= tipo_dat - 1; // size + 1 - 2
+						tipo_rcount <= CMD_IN_PARAMS_SZ - tipo_dat - 1;
 						tipo_state <= TIPO_CMD;
 					end
 				end
@@ -98,14 +108,18 @@ module tblink_rpc_cmdproc #(
 							tipo_state <= TIPO_ID_REQ;
 						end
 						cmd_in_r <= tipo_dat;
-						rcount <= rcount - 1'b1;
 					end
 				end
 				TIPO_ID_REQ: begin // Capture id
 					if (tipo_valid && tipo_ready) begin
 						tipo_id <= tipo_dat;
-						rcount <= rcount - 1'b1;
-						tipo_state <= TIPO_DAT_REQ;
+						if (tipo_count > 0) begin
+							tipo_state <= TIPO_DAT_REQ;
+						end else begin
+							// Signal command is ready
+							cmd_in_put_i_r <= ~cmd_in_put_i_r;
+							tipo_state <= TIPO_EXEC_REQ;
+						end
 					end
 				end
 				TIPO_DAT_REQ: begin : DAT_REQ // Capture remainder of the data
@@ -114,18 +128,33 @@ module tblink_rpc_cmdproc #(
 						for (i=0; i<(CMD_IN_PARAMS_SZ-1); i=i+1) begin
 							cmd_in_params_r[8*i+:8] <= cmd_in_params_r[8*(i+1)+:8];
 						end
-						if (rcount > 0) begin
+						if (tipo_count > 0) begin
 							cmd_in_params_r[8*(CMD_IN_PARAMS_SZ-1)+:8] <= tipo_dat;
-							rcount <= rcount - 1'b1;
-						end
-						tipo_state <= TIPO_EXEC_REQ;
-						// Signal command is ready
-						cmd_in_put_i_r <= ~cmd_in_put_i_r;
-						
-						if (rcount == 0) begin
-							// Process command
+							tipo_count <= tipo_count - 1'b1;
+						end else begin
+							if (tipo_rcount > 0) begin
+								tipo_state <= TIPO_SHL_REQ;
+								tipo_rcount <= tipo_rcount - 1'b1;
+							end else begin
+								// Signal command is ready
+								cmd_in_put_i_r <= ~cmd_in_put_i_r;
+								tipo_state <= TIPO_EXEC_REQ;
+							end
 						end
 					end
+				end
+				TIPO_SHL_REQ: begin : SHL_REQ
+					integer i;
+					for (i=0; i<(CMD_IN_PARAMS_SZ-1); i=i+1) begin
+						cmd_in_params_r[8*i+:8] <= cmd_in_params_r[8*(i+1)+:8];
+					end
+					
+					if (tipo_rcount == 0) begin
+						// Signal command is ready
+						cmd_in_put_i_r <= ~cmd_in_put_i_r;
+						tipo_state <= TIPO_EXEC_REQ;
+					end
+					tipo_rcount <= tipo_rcount - 1'b1;
 				end
 				TIPO_EXEC_REQ: begin // Process command
 					// Wait for the command to be accepted
@@ -157,6 +186,7 @@ module tblink_rpc_cmdproc #(
 				TIPO_WAIT_RSP_ACK: begin // Wait response from TIPI
 					if (tipo_rsp_valid && tipo_rsp_ready) begin
 						// Back to the beginning?
+						tipo_state <= TIPO_COUNT;
 					end
 				end
 				
@@ -170,16 +200,27 @@ module tblink_rpc_cmdproc #(
 		end
 	end
 	
-	localparam TIPI_IDLE = 4'b0000;
-	localparam TIPI_CMD_RSP_1 = 4'b0001;
-	localparam TIPI_CMD_RSP_2 = 4'b0001;
-	localparam TIPI_CMD_RSP_3 = 4'b0001;
-	localparam TIPI_CMD_RSP_4 = 4'b0001;
+	localparam TIPI_IDLE 		= 4'b0000;
+	localparam TIPI_CMD_RSP_1 	= (TIPI_IDLE+1'b1);
+	localparam TIPI_CMD_RSP_2 	= (TIPI_CMD_RSP_1+1'b1);
+	localparam TIPI_CMD_RSP_3 	= (TIPI_CMD_RSP_2+1'b1);
+	localparam TIPI_CMD_RSP_4	= (TIPI_CMD_RSP_3+1'b1); // 4
+	localparam TIPI_CMD_RSP_5	= (TIPI_CMD_RSP_4+1'b1);
 	
 	reg[3:0]				tipi_state;
 	reg[7:0]				tipi_dat_o;
 	reg[7:0]				tipi_tcount;
 	assign tipi_dat = tipi_dat_o;
+	
+	assign tipi_valid = (
+			tipi_state == TIPI_CMD_RSP_1 ||
+			tipi_state == TIPI_CMD_RSP_2 ||
+			tipi_state == TIPI_CMD_RSP_3 ||
+			tipi_state == TIPI_CMD_RSP_4
+		);
+	assign tipo_rsp_ready = (
+			tipi_state == TIPI_CMD_RSP_5
+		);
 	
 	// TIPI State Machine
 	// - Muxes between cmd-rsp and cmd-out-req
@@ -203,7 +244,7 @@ module tblink_rpc_cmdproc #(
 				TIPI_CMD_RSP_1: begin 	
 					// Wait for DST ack
 					if (tipi_valid && tipi_ready) begin
-						// Send SZ (data+id+rsp-1)
+						// Send SZ (data+2-1)
 						tipi_dat_o <= cmd_in_rsp_sz + 8'd1;
 						tipi_state <= TIPI_CMD_RSP_2;
 						tipi_tcount <= cmd_in_rsp_sz;
@@ -213,7 +254,7 @@ module tblink_rpc_cmdproc #(
 					// Wait for SZ ack
 					if (tipi_valid && tipi_ready) begin
 						// Send CMD (RSP)
-						tipi_dat_o <= {8{1'b0}};
+						tipi_dat_o <= {8{1'b0}}; // Response
 						tipi_state <= TIPI_CMD_RSP_3;
 					end
 				end
@@ -226,12 +267,18 @@ module tblink_rpc_cmdproc #(
 					end
 				end
 				TIPI_CMD_RSP_4: begin
-					// Wait ACK
+					// Wait ID ACK
 					if (tipi_valid && tipi_ready) begin
 						if (tipi_tcount == 8'd0) begin
+							tipi_state <= TIPI_CMD_RSP_5;
 						end else begin
+							tipi_tcount <= tipi_tcount - 1'b1;
+							// TODO: handle data response
 						end
 					end
+				end
+				TIPI_CMD_RSP_5: begin
+					tipi_state <= TIPI_IDLE;
 				end
 			endcase
 		end
