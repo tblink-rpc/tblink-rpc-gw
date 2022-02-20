@@ -1,0 +1,16 @@
+
+filespec:
+  - vlnv: tblink-rpc-gw::tblink-rpc-cmdproc_1_1-synth
+    out:
+      - name: MKDV_VL_SRCS
+        type: 
+          - verilogSource
+          - systemVerilogSource
+        flags: sv
+      - name: MKDV_VL_INCDIRS
+        type:
+          - verilogSource
+          - systemVerilogSource
+        flags: sv
+        include: True
+

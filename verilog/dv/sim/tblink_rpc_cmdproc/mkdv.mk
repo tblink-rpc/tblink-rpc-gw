@@ -10,11 +10,14 @@ VLSIM_OPTIONS += -Wno-fatal
 ifeq (icarus,$(MKDV_TOOL))
   TBLINK_RPC_PLUGIN := $(shell $(PYTHON) -m tblink_rpc_hdl simplugin vpi)
   VPI_LIBS += $(TBLINK_RPC_PLUGIN)
+  MKDV_VL_SRCS += $(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_vl.sv
 else
   TBLINK_RPC_PLUGIN := $(shell $(PYTHON) -m tblink_rpc_hdl simplugin dpi)
   DPI_LIBS += $(TBLINK_RPC_PLUGIN)
+  MKDV_VL_SRCS += $(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_sv.sv
 endif
 MKDV_PYTHONPATH += $(PYTHON_PATHS)
+
 
 TOP_MODULE = tblink_rpc_cmdproc_tb
 
@@ -41,5 +44,10 @@ else
 		-t mk -o $@
 endif
 
+ifeq (icarus,$(MKDV_TOOL))
+$(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_vl.sv : gen-bfms
+else
+$(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_sv.sv : gen-bfms
+endif
 
 

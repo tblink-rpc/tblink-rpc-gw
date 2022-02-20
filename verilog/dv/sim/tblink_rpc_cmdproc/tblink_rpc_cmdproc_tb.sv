@@ -81,7 +81,7 @@ module tblink_rpc_cmdproc_tb(input clock);
 
 	tblink_rpc_ep #(
 		.ADDR        (1       )
-		) u_dut (
+		) u_ep (
 		.uclock      (uclock     ), 
 		.reset       (reset      ), 
 		.hreq_i      (hreq_i     ), 
@@ -92,14 +92,6 @@ module tblink_rpc_cmdproc_tb(input clock);
 		`RV_CONNECT(tipi_, proc2tipi_)
 		);
 	
-	reg cmd_in_get_i_r;
-	
-	always @(posedge clock or posedge reset) begin
-		if (reset) begin
-			cmd_in_get_i_r <= 1'b0;
-		end
-	end
-	
 	localparam CMD_IN_PARAMS_SZ = 4;
 	localparam CMD_IN_RSP_SZ = 1;
 	localparam CMD_OUT_PARAMS_SZ = 4;
@@ -108,19 +100,17 @@ module tblink_rpc_cmdproc_tb(input clock);
 	wire[7:0]							cmd_in;
 	wire[7:0]							cmd_in_sz;
 	wire[(CMD_IN_PARAMS_SZ*8)-1:0]		cmd_in_params;
+	wire								cmd_in_get_i;
 	wire								cmd_in_put_i;
-	reg[(CMD_IN_RSP_SZ*8)-1:0]			cmd_in_rsp;
+	wire[(CMD_IN_RSP_SZ*8)-1:0]			cmd_in_rsp;
 	wire[7:0]							cmd_in_rsp_sz;
-	
-	assign cmd_in_rsp_sz = {8{1'b0}};
-	
 	
 	tblink_rpc_cmdproc #(
 		.CMD_IN_PARAMS_SZ  (CMD_IN_PARAMS_SZ ), 
 		.CMD_IN_RSP_SZ     (CMD_IN_RSP_SZ    ), 
-		.CMD_OUT_PARAM_SZ  (CMD_OUT_PARAMS_SZ), 
+		.CMD_OUT_PARAMS_SZ (CMD_OUT_PARAMS_SZ), 
 		.CMD_OUT_RSP_SZ    (CMD_OUT_RSP_SZ   )
-		) u_cmdproc (
+		) u_dut (
 		.uclock            (uclock           ), 
 		.reset             (reset            ), 
 		`RV_CONNECT(tipo_, tipo2proc_),
@@ -129,7 +119,7 @@ module tblink_rpc_cmdproc_tb(input clock);
 		.cmd_in_sz         (cmd_in_sz        ), 
 		.cmd_in_params     (cmd_in_params    ), 
 		.cmd_in_put_i      (cmd_in_put_i     ), 
-		.cmd_in_get_i      (cmd_in_get_i_r   ), 
+		.cmd_in_get_i      (cmd_in_get_i     ), 
 		.cmd_in_rsp        (cmd_in_rsp       ), 
 		.cmd_in_rsp_sz     (cmd_in_rsp_sz    ) 
 		/*
@@ -142,18 +132,25 @@ module tblink_rpc_cmdproc_tb(input clock);
 		 */
 		);
 	
-	wire cmd_in_valid = (cmd_in_put_i != cmd_in_get_i_r);
+	wire cmd_in_valid = (cmd_in_put_i != cmd_in_get_i);
 	
-	always @(posedge cclock or posedge reset) begin
-		if (reset) begin
-		end else begin
-			if (cmd_in_put_i != cmd_in_get_i_r) begin
-				$display("COMMAND");
-				cmd_in_get_i_r <= ~cmd_in_get_i_r;
-			end 
-		end
-	end
-
+	cmdproc_bfm #(
+		.CMD_IN_PARAMS_SZ  (CMD_IN_PARAMS_SZ ), 
+		.CMD_IN_RSP_SZ     (CMD_IN_RSP_SZ    ), 
+		.CMD_OUT_PARAMS_SZ (CMD_OUT_PARAMS_SZ), 
+		.CMD_OUT_RSP_SZ    (CMD_OUT_RSP_SZ   )
+		) u_cmdproc_bfm (
+			.cclock			(cclock			),
+			.reset			(reset			),
+			.cmd_in			(cmd_in			),
+			.cmd_in_sz		(cmd_in_sz		),
+			.cmd_in_params	(cmd_in_params	),
+			.cmd_in_put_i	(cmd_in_put_i	),
+			.cmd_in_get_i	(cmd_in_get_i	),
+			.cmd_in_rsp		(cmd_in_rsp		),
+			.cmd_in_rsp_sz	(cmd_in_rsp_sz	)
+		);
+	
 endmodule
 
 

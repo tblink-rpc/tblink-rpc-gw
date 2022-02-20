@@ -9,6 +9,7 @@ import tblink_rpc
 import rv_bfms
 from tblink_rpc_gw_tests.cmdproc.test_base import TestBase
 from tblink_rpc_gw.transport.msg_bfm_cmd import MsgBfmCmd
+import cmdproc
 
 class SmokeTest(TestBase):
 

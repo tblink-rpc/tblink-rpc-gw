@@ -1,0 +1,112 @@
+/****************************************************************************
+ * cmdproc_bfm_sim.sv
+ ****************************************************************************/
+{% set tblink_generators = ({
+    "cmdproc_bfm_sv.sv" : "tblink.bfm_impl.sv",
+    "cmdproc_bfm_vl.sv" : "tblink.bfm_impl.vl"
+    })
+ %}
+`include "rv_macros.svh"
+ 
+
+module cmdproc_bfm #(
+		parameter CMD_IN_PARAMS_SZ = 1,
+		parameter CMD_IN_RSP_SZ = 1,
+		parameter CMD_OUT_PARAMS_SZ = 1,
+		parameter CMD_OUT_RSP_SZ = 1
+	) (
+		input								cclock,
+		input								reset,
+		input[7:0]							cmd_in,
+		input[7:0]							cmd_in_sz,
+		input[(CMD_IN_PARAMS_SZ*8)-1:0]		cmd_in_params,
+		input								cmd_in_put_i,
+		output								cmd_in_get_i,
+		output[(CMD_IN_RSP_SZ*8)-1:0]		cmd_in_rsp,
+		output[7:0]							cmd_in_rsp_sz,
+		
+		output[7:0]							cmd_out,
+		output[7:0]							cmd_out_sz,
+		output[(CMD_OUT_PARAMS_SZ*8)-1:0]	cmd_out_params,
+		output								cmd_out_put_i,
+		input								cmd_out_get_i,
+		input[(CMD_OUT_RSP_SZ*8)-1:0]		cmd_out_rsp	
+	);
+	
+	reg in_reset = 0;
+	reg cmd_in_get_i_r = 0;
+	reg cmd_in_ack_v = 0;
+	
+	assign cmd_in_get_i = cmd_in_get_i_r;
+
+	// Inbound command process
+	reg[1:0]		cmd_in_state;	
+	always @(posedge cclock or posedge reset) begin
+		if (reset) begin
+			in_reset <= 1'b1;
+			cmd_in_get_i_r <= 1'b0;
+			cmd_in_state <= {2{1'b0}};
+		end else begin
+			if (in_reset) begin
+				_reset;
+				in_reset <= 1'b0;
+			end
+			case (cmd_in_state)
+			// Wait for a valid command
+			2'b00: begin : _wait_cmd_in_valid
+				integer i;
+				if (cmd_in_get_i_r != cmd_in_put_i) begin
+					// Command is valid
+					for (i=0; i<cmd_in_sz; i=i+1) begin
+						_in_cmd_data(cmd_in_params[8*i+:8]);
+					end
+					_in_valid(cmd_in, cmd_in_sz);
+					cmd_in_state <= 2'b01;
+				end
+			end
+			
+			// Wait for the acknowledge
+			2'b01: begin
+				if (cmd_in_ack_v) begin
+					cmd_in_ack_v = 0;
+					$display("Acknowledge Command");
+					cmd_in_get_i_r <= ~cmd_in_get_i_r;
+					cmd_in_state <= 2'b00;
+				end
+			end
+			
+			endcase
+		end
+	end
+	
+	task _in_rsp_data(input reg[7:0] data);
+	begin
+	end
+	endtask
+	
+	task _in_ack(input reg[7:0] sz);
+	begin
+		$display("_in_ack");
+		cmd_in_ack_v = 1;
+	end
+	endtask
+	
+	task _out_cmd_data(input reg[7:0] data);
+	begin
+	end
+	endtask
+	
+	task _out_valid(input reg[7:0] cmd, input reg[7:0] sz);
+	begin
+	end
+	endtask
+
+// Note: Begin Generated Content
+{{ tblink_gen(
+         iftype="cmdproc",
+         is_mirror=False,
+         kind="bfm") }}	
+// Note: End Generated Content
+
+endmodule
+

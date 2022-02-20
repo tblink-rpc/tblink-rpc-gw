@@ -1,0 +1,101 @@
+
+interface-types:
+  - name: cmdproc
+    methods:
+      #****************************************************************
+      #* _in_cmd_data
+      #*
+      #* Queues in-command data prior to 'valid' being signaled
+      #****************************************************************
+      - name: _in_cmd_data
+        is-export: False
+        is-blocking: False
+        parameters:
+        - name: data
+          type: uint8
+
+      #****************************************************************
+      #* _in_valid
+      #*
+      #* Signals a valid command
+      #****************************************************************
+      - name: _in_valid
+        is-export: False
+        is-blocking: False
+        parameters:
+        - name: cmd
+          type: uint8
+        - name: sz
+          type: uint8
+
+      #****************************************************************
+      #* Sends in-command response data prior to the command being
+      #* acknowledged
+      #****************************************************************
+      - name: _in_rsp_data
+        is-export: True
+        is-blocking: True
+        parameters:
+        - name: data
+          type: uint8
+          
+      #****************************************************************
+      #* Acknowledges the command
+      #****************************************************************
+      - name: _in_ack
+        is-export: True
+        is-blocking: True 
+        parameters:
+        - name: sz
+          type: uint8
+
+      #****************************************************************
+      #* Queues out-command data prior to signaling valid
+      #****************************************************************
+      - name: _out_cmd_data
+        is-export: True
+        is-blocking: True
+        parameters:
+        - name: data
+          type: uint8
+
+      #****************************************************************
+      #* Signals out-command valid
+      #****************************************************************
+      - name: _out_valid
+        is-export: True
+        is-blocking: True
+        parameters:
+        - name: cmd
+          type: uint8
+        - name: sz
+          type: uint8
+
+      #****************************************************************
+      #* 
+      #****************************************************************
+      - name: _out_rsp_data
+        is-export: False
+        is-blocking: False
+        parameters:
+        - name: data
+          type: uint8
+
+      #****************************************************************
+      #* 
+      #****************************************************************
+      - name: _out_ack
+        is-export: False
+        is-blocking: False
+        parameters:
+        - name: sz
+          type: uint8
+          
+      #****************************************************************
+      #* _reset
+      #****************************************************************
+      - name: _reset
+        is-export: False
+        is-blocking: False
+
+    
