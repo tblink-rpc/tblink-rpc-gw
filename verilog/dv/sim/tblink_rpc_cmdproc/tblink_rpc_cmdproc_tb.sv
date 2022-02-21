@@ -105,6 +105,14 @@ module tblink_rpc_cmdproc_tb(input clock);
 	wire[(CMD_IN_RSP_SZ*8)-1:0]			cmd_in_rsp;
 	wire[7:0]							cmd_in_rsp_sz;
 	
+	wire[7:0]							cmd_out;
+	wire[7:0]							cmd_out_sz;
+	wire[(CMD_OUT_PARAMS_SZ*8)-1:0]	cmd_out_params;
+	wire								cmd_out_put_i;
+	wire								cmd_out_get_i;
+	wire[(CMD_OUT_RSP_SZ*8)-1:0]		cmd_out_rsp;
+	wire[7:0]							cmd_out_rsp_sz;
+	
 	tblink_rpc_cmdproc #(
 		.CMD_IN_PARAMS_SZ  (CMD_IN_PARAMS_SZ ), 
 		.CMD_IN_RSP_SZ     (CMD_IN_RSP_SZ    ), 
@@ -121,15 +129,14 @@ module tblink_rpc_cmdproc_tb(input clock);
 		.cmd_in_put_i      (cmd_in_put_i     ), 
 		.cmd_in_get_i      (cmd_in_get_i     ), 
 		.cmd_in_rsp        (cmd_in_rsp       ), 
-		.cmd_in_rsp_sz     (cmd_in_rsp_sz    ) 
-		/*
+		.cmd_in_rsp_sz     (cmd_in_rsp_sz    ),
 		.cmd_out           (cmd_out          ), 
 		.cmd_out_sz        (cmd_out_sz       ), 
 		.cmd_out_params    (cmd_out_params   ), 
 		.cmd_out_put_i     (cmd_out_put_i    ), 
 		.cmd_out_get_i     (cmd_out_get_i    ), 
-		.cmd_out_rsp       (cmd_out_rsp      )
-		 */
+		.cmd_out_rsp       (cmd_out_rsp      ),
+		.cmd_out_rsp_sz    (cmd_out_rsp_sz   )
 		);
 	
 	wire cmd_in_valid = (cmd_in_put_i != cmd_in_get_i);
@@ -148,7 +155,14 @@ module tblink_rpc_cmdproc_tb(input clock);
 			.cmd_in_put_i	(cmd_in_put_i	),
 			.cmd_in_get_i	(cmd_in_get_i	),
 			.cmd_in_rsp		(cmd_in_rsp		),
-			.cmd_in_rsp_sz	(cmd_in_rsp_sz	)
+			.cmd_in_rsp_sz	(cmd_in_rsp_sz	),
+			.cmd_out        (cmd_out        ), 
+			.cmd_out_sz     (cmd_out_sz     ), 
+			.cmd_out_params (cmd_out_params ), 
+			.cmd_out_put_i  (cmd_out_put_i  ), 
+			.cmd_out_get_i  (cmd_out_get_i  ), 
+			.cmd_out_rsp    (cmd_out_rsp    ),
+			.cmd_out_rsp_sz (cmd_out_rsp_sz )
 		);
 	
 endmodule

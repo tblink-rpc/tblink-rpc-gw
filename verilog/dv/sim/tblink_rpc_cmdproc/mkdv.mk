@@ -10,11 +10,11 @@ VLSIM_OPTIONS += -Wno-fatal
 ifeq (icarus,$(MKDV_TOOL))
   TBLINK_RPC_PLUGIN := $(shell $(PYTHON) -m tblink_rpc_hdl simplugin vpi)
   VPI_LIBS += $(TBLINK_RPC_PLUGIN)
-  MKDV_VL_SRCS += $(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_vl.sv
+  BFM_SRCFILE := $(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_vl.sv
 else
   TBLINK_RPC_PLUGIN := $(shell $(PYTHON) -m tblink_rpc_hdl simplugin dpi)
   DPI_LIBS += $(TBLINK_RPC_PLUGIN)
-  MKDV_VL_SRCS += $(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_sv.sv
+  BFM_SRCFILE := $(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_sv.sv
 endif
 MKDV_PYTHONPATH += $(PYTHON_PATHS)
 
@@ -28,11 +28,15 @@ MKDV_RUN_ARGS += +tblink.launch=python.loopback
 MKDV_RUN_ARGS += +module=tblink_rpc.rt.cocotb
 
 include $(TEST_DIR)/../../common/defs_rules.mk
+include $(MKDV_CACHEDIR)/files.mk
+MKDV_VL_SRCS += $(BFM_SRCFILE)
+
+export MKDV_CACHEDIR
 
 RULES := 1
 
 include $(TEST_DIR)/../../common/defs_rules.mk
-include $(MKDV_CACHEDIR)/files.mk
+
 
 $(MKDV_CACHEDIR)/files.mk :
 	mkdir -p $(MKDV_CACHEDIR)
@@ -44,10 +48,6 @@ else
 		-t mk -o $@
 endif
 
-ifeq (icarus,$(MKDV_TOOL))
-$(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_vl.sv : gen-bfms
-else
-$(MKDV_CACHEDIR)/bfm/backends/cmdproc_bfm_sv.sv : gen-bfms
-endif
+$(BFM_SRCFILE) : gen-bfms
 
 

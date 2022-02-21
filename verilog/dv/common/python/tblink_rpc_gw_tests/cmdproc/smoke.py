@@ -16,15 +16,19 @@ class SmokeTest(TestBase):
     async def run(self):
         print("--> Run")
         # DST, ID, CMD
-        msg = MsgBfmCmd(1, 1, 1)
-        print("msg: %s" % str(msg.pack()))
-        await self.net_i.send(msg.pack())
-        
-        msg = MsgBfmCmd(1, 1, 2)
-        await self.net_i.send(msg.pack())
-        
-        msg = MsgBfmCmd(1, 1, 3)
-        await self.net_i.send(msg.pack())
+        # msg = MsgBfmCmd(1, 1, 1)
+        # print("msg: %s" % str(msg.pack()))
+        # await self.net_i.send(msg.pack())
+        #
+        # msg = MsgBfmCmd(1, 1, 2)
+        # await self.net_i.send(msg.pack())
+        #
+        # msg = MsgBfmCmd(1, 1, 3)
+        # await self.net_i.send(msg.pack())
+
+        print("--> send_bfm_cmd")
+        await self.cmdproc.send_bfm_cmd(0x55, [1, 2])
+        print("<-- send_bfm_cmd")
         
         print("<-- Run")
         

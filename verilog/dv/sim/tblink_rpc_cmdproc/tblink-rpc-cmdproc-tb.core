@@ -6,6 +6,8 @@ filesets:
   rtl:
     files:
       - tblink_rpc_cmdproc_tb.sv
+#      - "sv ? (${MKDV_CACHEDIR}/bfm/backends/cmdproc_bfm_sv.sv)"
+#      - "vl ? (${MKDV_CACHEDIR}/bfm/backends/cmdproc_bfm_sv.sv)"
     file_type: systemVerilogSource
     depend:
       - tblink-rpc::tblink-rpc-gw

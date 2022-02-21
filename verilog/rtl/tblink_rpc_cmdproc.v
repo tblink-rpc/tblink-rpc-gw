@@ -32,7 +32,8 @@ module tblink_rpc_cmdproc #(
 		input[(CMD_OUT_PARAMS_SZ*8)-1:0]	cmd_out_params,
 		input								cmd_out_put_i,
 		output								cmd_out_get_i,
-		output[(CMD_OUT_RSP_SZ*8)-1:0]		cmd_out_rsp
+		output[(CMD_OUT_RSP_SZ*8)-1:0]		cmd_out_rsp,
+		output[7:0]							cmd_out_rsp_sz
 		);
 
 	reg 									cmd_in_put_i_r;
@@ -206,21 +207,27 @@ module tblink_rpc_cmdproc #(
 	localparam TIPI_CMD_RSP_3 	= (TIPI_CMD_RSP_2+1'b1);
 	localparam TIPI_CMD_RSP_4	= (TIPI_CMD_RSP_3+1'b1); // 4
 	localparam TIPI_CMD_RSP_5	= (TIPI_CMD_RSP_4+1'b1);
+	localparam TIPI_OUT_REQ_1	= (TIPI_CMD_RSP_5+1'b1);
+	localparam TIPI_OUT_REQ_2	= (TIPI_OUT_REQ_1+1'b1);
+	localparam TIPI_OUT_REQ_3	= (TIPI_OUT_REQ_2+1'b1);
+	localparam TIPI_OUT_REQ_4	= (TIPI_OUT_REQ_3+1'b1);
+	localparam TIPI_OUT_REQ_5	= (TIPI_OUT_REQ_4+1'b1);
+	localparam TIPI_OUT_WAIT_RSP	= (TIPI_OUT_REQ_5+1'b1);
+//	localparam TIPI_
 	
-	reg[3:0]				tipi_state;
-	reg[7:0]				tipi_dat_o;
-	reg[7:0]				tipi_tcount;
+	reg[3:0]							tipi_state;
+	reg[7:0]							tipi_dat_o;
+	reg[7:0]							tipi_tcount;
+	reg[7:0]							tipi_id;
+	reg[(8*CMD_OUT_PARAMS_SZ)-1:0]		cmd_out_r;
 	assign tipi_dat = tipi_dat_o;
 	
 	assign tipi_valid = (
-			tipi_state == TIPI_CMD_RSP_1 ||
-			tipi_state == TIPI_CMD_RSP_2 ||
-			tipi_state == TIPI_CMD_RSP_3 ||
-			tipi_state == TIPI_CMD_RSP_4
-		);
-	assign tipo_rsp_ready = (
-			tipi_state == TIPI_CMD_RSP_5
-		);
+			(tipi_state != TIPI_IDLE) &&
+			(tipi_state != TIPI_OUT_WAIT_RSP));
+	assign tipo_rsp_ready = (tipi_state == TIPI_CMD_RSP_5);
+	
+	assign cmd_out_get_i = cmd_out_get_i_r;
 	
 	// TIPI State Machine
 	// - Muxes between cmd-rsp and cmd-out-req
@@ -230,11 +237,16 @@ module tblink_rpc_cmdproc #(
 			tipi_state <= TIPI_IDLE;
 			tipi_dat_o <= {8{1'b0}};
 			tipi_tcount <= {8{1'b0}};
+			tipi_id <= {8{1'b0}};
+			cmd_out_r <= {8*CMD_OUT_PARAMS_SZ{1'b0}};
 		end else begin
 			case (tipi_state) 
 				TIPI_IDLE: begin
 					if (cmd_out_get_i_r != cmd_out_put_i) begin
 						// outside world requesting
+						tipi_dat_o <= {8{1'b0}}; // DST ID 0
+						tipi_state <= TIPI_OUT_REQ_1;
+						cmd_out_r <= cmd_out;
 					end else if (tipo_rsp_valid) begin
 						// TIPO requesting to send a response
 						tipi_dat_o <= {8{1'b0}}; // DST ID 0
@@ -279,6 +291,67 @@ module tblink_rpc_cmdproc #(
 				end
 				TIPI_CMD_RSP_5: begin
 					tipi_state <= TIPI_IDLE;
+				end
+				TIPI_OUT_REQ_1: begin
+					// Wait DST ACK
+					if (tipi_valid && tipi_ready) begin
+						tipi_state <= TIPI_OUT_REQ_2;
+						tipi_dat_o <= cmd_out_sz + 8'd1;
+						tipi_tcount <= cmd_out_sz;
+					end
+				end
+				TIPI_OUT_REQ_2: begin
+					// Wait SZ Ack
+					if (tipi_valid && tipi_ready) begin
+						tipi_state <= TIPI_OUT_REQ_3;
+						tipi_dat_o <= {8{1'b0}}; // Response is CMD==0
+					end
+				end
+				TIPI_OUT_REQ_3: begin
+					// Wait CMD Ack
+					if (tipi_valid && tipi_ready) begin
+						tipi_state <= TIPI_OUT_REQ_4;
+						tipi_dat_o <= tipi_id;
+						tipi_id <= tipi_id + 1'b1;
+					end
+				end
+				TIPI_OUT_REQ_4: begin
+					// Wait ID Ack
+					if (tipi_valid && tipi_ready) begin
+						tipi_state <= TIPI_OUT_REQ_5;
+						tipi_dat_o <= tipi_id;
+						
+						if (tipi_tcount > 0) begin
+							// Move on to send data
+							tipi_state <= TIPI_OUT_REQ_5;
+							tipi_dat_o <= cmd_out_r[7:0];
+							tipi_tcount <= tipi_tcount - 1'b1;
+						end else begin
+							// Done sending request message
+							tipi_state <= TIPI_IDLE;
+						end
+					end
+				end
+				TIPI_OUT_REQ_5: begin : OUT_REQ_5
+					integer i;
+					
+					// Send data
+					if (tipi_valid && tipi_ready) begin
+						cmd_out_get_i_r <= ~cmd_out_get_i_r;
+						for (i=1; i<CMD_OUT_PARAMS_SZ; i=i+1) begin
+							cmd_out_r[8*(i-1)+:8] <= cmd_out_r[8*i+:8];
+						end
+						
+						if (tipi_tcount == 0) begin
+							// 
+							tipi_state <= TIPI_OUT_WAIT_RSP;
+						end
+						
+						tipi_dat_o <= cmd_out_r[15:8];
+						tipi_tcount <= tipi_tcount - 1'b1;
+					end
+				end
+				TIPI_OUT_WAIT_RSP: begin
 				end
 			endcase
 		end

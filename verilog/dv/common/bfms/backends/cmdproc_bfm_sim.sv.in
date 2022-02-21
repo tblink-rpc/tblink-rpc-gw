@@ -30,14 +30,22 @@ module cmdproc_bfm #(
 		output[(CMD_OUT_PARAMS_SZ*8)-1:0]	cmd_out_params,
 		output								cmd_out_put_i,
 		input								cmd_out_get_i,
-		input[(CMD_OUT_RSP_SZ*8)-1:0]		cmd_out_rsp	
+		input[(CMD_OUT_RSP_SZ*8)-1:0]		cmd_out_rsp,
+		input[7:0]							cmd_out_rsp_sz	
 	);
 	
 	reg in_reset = 0;
 	reg cmd_in_get_i_r = 0;
 	reg cmd_in_ack_v = 0;
+	reg[7:0] cmd_in_rsp_sz_r = 8'b0;
+	reg[7:0] cmd_in_rsp_sz_v = 8'b0;
+	reg[(8*CMD_OUT_PARAMS_SZ)-1:0]		cmd_in_rsp_v = 0;
+	reg[(8*CMD_OUT_PARAMS_SZ)-1:0]		cmd_in_rsp_r;
+	reg[7:0]							cmd_in_rsp_idx_v = 8'b0;
 	
 	assign cmd_in_get_i = cmd_in_get_i_r;
+	assign cmd_in_rsp_sz = cmd_in_rsp_sz_r;
+	assign cmd_in_rsp = cmd_in_rsp_r;
 
 	// Inbound command process
 	reg[1:0]		cmd_in_state;	
@@ -46,6 +54,8 @@ module cmdproc_bfm #(
 			in_reset <= 1'b1;
 			cmd_in_get_i_r <= 1'b0;
 			cmd_in_state <= {2{1'b0}};
+			cmd_in_rsp_sz_r <= {8{1'b0}};
+			cmd_in_rsp_r <= {8*CMD_OUT_PARAMS_SZ{1'b0}};
 		end else begin
 			if (in_reset) begin
 				_reset;
@@ -68,10 +78,16 @@ module cmdproc_bfm #(
 			// Wait for the acknowledge
 			2'b01: begin
 				if (cmd_in_ack_v) begin
-					cmd_in_ack_v = 0;
 					$display("Acknowledge Command");
 					cmd_in_get_i_r <= ~cmd_in_get_i_r;
+					cmd_in_rsp_r <= cmd_in_rsp_v;
+					cmd_in_rsp_sz_r <= cmd_in_rsp_sz_v;
 					cmd_in_state <= 2'b00;
+				
+					// Reset variable state	
+					cmd_in_ack_v = 0;
+					cmd_in_rsp_v = 0;
+					cmd_in_rsp_idx_v = 0;
 				end
 			end
 			
@@ -81,6 +97,8 @@ module cmdproc_bfm #(
 	
 	task _in_rsp_data(input reg[7:0] data);
 	begin
+		cmd_in_rsp_v[cmd_in_rsp_idx_v*8+:8] = data;
+		cmd_in_rsp_idx_v = cmd_in_rsp_idx_v + 1;
 	end
 	endtask
 	
@@ -88,16 +106,67 @@ module cmdproc_bfm #(
 	begin
 		$display("_in_ack");
 		cmd_in_ack_v = 1;
+		cmd_in_rsp_sz_v = sz;
 	end
 	endtask
 	
+	reg								cmd_out_valid_v = 0;
+	reg								cmd_out_put_r;
+	reg[7:0]						cmd_out_idx_v = 0;
+	reg[(8*CMD_OUT_PARAMS_SZ)-1:0]	cmd_out_r;
+	reg[(8*CMD_OUT_PARAMS_SZ)-1:0]	cmd_out_v;
+	reg[7:0]						cmd_out_sz_r;
+	reg[7:0]						cmd_out_sz_v;
+	reg[1:0]						cmd_out_state;
+	
+	assign cmd_out_put_i = cmd_out_put_r;
+	assign cmd_out = cmd_out_r;
+	assign cmd_out_sz = cmd_out_sz_r;
+	
+	// Outbound command process
+	always @(posedge cclock or posedge reset) begin
+		if (reset) begin
+			cmd_out_put_r <= 1'b0;
+			cmd_out_r <= {8*CMD_OUT_PARAMS_SZ{1'b0}};
+			cmd_out_sz_r <= {8{1'b0}};
+			cmd_out_state <= {2{1'b0}};
+		end else begin
+			case (cmd_out_state)
+				2'b00: begin // Wait for valid to be signaled
+					if (cmd_out_valid_v) begin
+						cmd_out_put_r <= ~cmd_out_put_r;
+						cmd_out_state <= 2'b01;
+						cmd_out_r <= cmd_out_v;
+						cmd_out_sz_r <= cmd_out_sz_v;
+						
+						cmd_out_v = 8'b0;
+						cmd_out_sz_v = 8'b0;
+						cmd_out_valid_v = 0;
+						cmd_out_idx_v = 0;
+					end
+				end
+				2'b01: begin // Wait for acknowledge
+					if (cmd_out_put_i == cmd_out_get_i) begin
+						_out_ack(cmd_out_rsp_sz);
+						cmd_out_state <= 2'b00;
+					end
+				end
+			endcase
+		end
+	end
+	
 	task _out_cmd_data(input reg[7:0] data);
 	begin
+		cmd_out_v[8*cmd_out_idx_v+:8] = data;
+		cmd_out_idx_v = cmd_out_idx_v + 1;
 	end
 	endtask
 	
 	task _out_valid(input reg[7:0] cmd, input reg[7:0] sz);
 	begin
+		cmd_out_v = cmd;
+		cmd_out_sz_v = sz;
+		cmd_out_valid_v = 1;
 	end
 	endtask
 
