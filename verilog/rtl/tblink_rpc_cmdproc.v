@@ -68,7 +68,6 @@ module tblink_rpc_cmdproc #(
 	wire tipo_rsp_ready;
 
 	reg[7:0] tipo_count;
-	reg[7:0] tipo_rcount;
 	
 	assign tipo_ready = (
 			tipo_state == TIPO_COUNT ||
@@ -96,7 +95,8 @@ module tblink_rpc_cmdproc #(
 				TIPO_COUNT: begin // Count
 					if (tipo_valid && tipo_ready) begin
 						tipo_count <= tipo_dat - 1; // size + 1 - 2
-						tipo_rcount <= CMD_IN_PARAMS_SZ - tipo_dat - 1;
+						cmd_in_sz_r <= tipo_dat - 1; // size + 1 - 2
+						cmd_in_params_r <= {CMD_IN_PARAMS_SZ*8{1'b0}};
 						tipo_state <= TIPO_CMD;
 					end
 				end
@@ -116,6 +116,7 @@ module tblink_rpc_cmdproc #(
 						tipo_id <= tipo_dat;
 						if (tipo_count > 0) begin
 							tipo_state <= TIPO_DAT_REQ;
+							tipo_count <= tipo_count - 1;
 						end else begin
 							// Signal command is ready
 							cmd_in_put_i_r <= ~cmd_in_put_i_r;
@@ -126,24 +127,19 @@ module tblink_rpc_cmdproc #(
 				TIPO_DAT_REQ: begin : DAT_REQ // Capture remainder of the data
 					integer i;
 					if (tipo_valid && tipo_ready) begin
-						for (i=0; i<(CMD_IN_PARAMS_SZ-1); i=i+1) begin
-							cmd_in_params_r[8*i+:8] <= cmd_in_params_r[8*(i+1)+:8];
+						for (i=CMD_IN_PARAMS_SZ-1; i>0; i=i-1) begin
+							cmd_in_params_r[8*i+:8] <= cmd_in_params_r[8*(i-1)+:8];
 						end
+						cmd_in_params_r[7:0] <= tipo_dat;
 						if (tipo_count > 0) begin
-							cmd_in_params_r[8*(CMD_IN_PARAMS_SZ-1)+:8] <= tipo_dat;
 							tipo_count <= tipo_count - 1'b1;
 						end else begin
-							if (tipo_rcount > 0) begin
-								tipo_state <= TIPO_SHL_REQ;
-								tipo_rcount <= tipo_rcount - 1'b1;
-							end else begin
-								// Signal command is ready
-								cmd_in_put_i_r <= ~cmd_in_put_i_r;
-								tipo_state <= TIPO_EXEC_REQ;
-							end
+							cmd_in_put_i_r <= ~cmd_in_put_i_r;
+							tipo_state <= TIPO_EXEC_REQ;
 						end
 					end
 				end
+				/*
 				TIPO_SHL_REQ: begin : SHL_REQ
 					integer i;
 					for (i=0; i<(CMD_IN_PARAMS_SZ-1); i=i+1) begin
@@ -157,6 +153,7 @@ module tblink_rpc_cmdproc #(
 					end
 					tipo_rcount <= tipo_rcount - 1'b1;
 				end
+				 */
 				TIPO_EXEC_REQ: begin // Process command
 					// Wait for the command to be accepted
 					if (cmd_in_put_i_r == cmd_in_get_i) begin
@@ -224,6 +221,7 @@ module tblink_rpc_cmdproc #(
 	
 	assign tipi_valid = (
 			(tipi_state != TIPI_IDLE) &&
+			(tipi_state != TIPI_CMD_RSP_5) &&
 			(tipi_state != TIPI_OUT_WAIT_RSP));
 	assign tipo_rsp_ready = (tipi_state == TIPI_CMD_RSP_5);
 	
