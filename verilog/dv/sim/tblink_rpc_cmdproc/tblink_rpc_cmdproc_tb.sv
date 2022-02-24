@@ -93,9 +93,9 @@ module tblink_rpc_cmdproc_tb(input clock);
 		);
 	
 	localparam CMD_IN_PARAMS_SZ = 4;
-	localparam CMD_IN_RSP_SZ = 1;
+	localparam CMD_IN_RSP_SZ = 4;
 	localparam CMD_OUT_PARAMS_SZ = 4;
-	localparam CMD_OUT_RSP_SZ = 1;
+	localparam CMD_OUT_RSP_SZ = 4;
 
 	wire[7:0]							cmd_in;
 	wire[7:0]							cmd_in_sz;
