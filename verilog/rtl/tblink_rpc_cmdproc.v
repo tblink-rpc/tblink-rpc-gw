@@ -239,7 +239,7 @@ module tblink_rpc_cmdproc #(
 	localparam TIPI_CMD_RSP_5	= (TIPI_CMD_RSP_4+1'b1);
 	localparam TIPI_OUT_REQ_1	= (TIPI_CMD_RSP_5+1'b1);
 	localparam TIPI_OUT_REQ_2	= (TIPI_OUT_REQ_1+1'b1);
-	localparam TIPI_OUT_REQ_3	= (TIPI_OUT_REQ_2+1'b1);
+	localparam TIPI_OUT_REQ_3	= (TIPI_OUT_REQ_2+1'b1); // 8
 	localparam TIPI_OUT_REQ_4	= (TIPI_OUT_REQ_3+1'b1);
 	localparam TIPI_OUT_REQ_5	= (TIPI_OUT_REQ_4+1'b1);
 	localparam TIPI_OUT_WAIT_RSP	= (TIPI_OUT_REQ_5+1'b1);
@@ -360,7 +360,8 @@ module tblink_rpc_cmdproc #(
 							tipi_tcount <= tipi_tcount - 1'b1;
 						end else begin
 							// Done sending request message
-							tipi_state <= TIPI_IDLE;
+							// Wait for an ack
+							tipi_state <= TIPI_OUT_WAIT_RSP;
 						end
 					end
 				end
