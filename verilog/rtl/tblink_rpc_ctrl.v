@@ -63,7 +63,7 @@ module tblink_rpc_ctrl(
 		`RV_CONNECT(tipi_, demux2ntipi_),
 		`RV_CONNECT(tipo_, ntipo2mux_)
 		);
-
+	
 	wire cclock_en;
 	reg[63:0]		cclock_count;
 	reg				cclock_r;
@@ -116,6 +116,52 @@ module tblink_rpc_ctrl(
 	
 	integer req_buf_i, rsp_buf_i;
 	
+	localparam CMD_IN_PARAMS_SZ   = 8;
+	localparam CMD_IN_RSP_SZ      = 8;
+	localparam CMD_OUT_PARAMS_SZ  = 1;
+	localparam CMD_OUT_RSP_SZ     = 1;
+
+	wire[7:0]							cmd_in;
+	wire[7:0]							cmd_in_sz;
+	wire[(8*CMD_IN_PARAMS_SZ)-1:0]		cmd_in_params;
+	wire								cmd_in_put_i;
+	reg									cmd_in_get_i;
+	reg[(8*CMD_IN_RSP_SZ)-1:0]			cmd_in_rsp;
+	reg[7:0]							cmd_in_rsp_sz;
+	reg[7:0]							cmd_out;
+	reg[7:0]							cmd_out_sz;
+	reg[(8*CMD_OUT_PARAMS_SZ)-1:0]		cmd_out_params;
+	reg									cmd_out_put_i;
+	wire								cmd_out_get_i;
+	wire[(8*CMD_OUT_RSP_SZ)-1:0]		cmd_out_rsp;
+	wire[7:0]							cmd_out_rsp_sz;
+
+
+	tblink_rpc_cmdproc #(
+		.CMD_IN_PARAMS_SZ   (CMD_IN_PARAMS_SZ   ), 
+		.CMD_IN_RSP_SZ      (CMD_IN_RSP_SZ      ), 
+		.CMD_OUT_PARAMS_SZ  (CMD_OUT_PARAMS_SZ  ), 
+		.CMD_OUT_RSP_SZ     (CMD_OUT_RSP_SZ     )
+		) u_cmdproc (
+		.uclock             (uclock            ), 
+		.reset              (reset             ), 
+		`RV_CONNECT(tipo_, demux2local_),
+		`RV_CONNECT(tipi_, local2mux_),
+		.cmd_in             (cmd_in            ), 
+		.cmd_in_sz          (cmd_in_sz         ), 
+		.cmd_in_params      (cmd_in_params     ), 
+		.cmd_in_put_i       (cmd_in_put_i      ), 
+		.cmd_in_get_i       (cmd_in_get_i      ), 
+		.cmd_in_rsp         (cmd_in_rsp        ), 
+		.cmd_in_rsp_sz      (cmd_in_rsp_sz     ), 
+		.cmd_out            (cmd_out           ), 
+		.cmd_out_sz         (cmd_out_sz        ), 
+		.cmd_out_params     (cmd_out_params    ), 
+		.cmd_out_put_i      (cmd_out_put_i     ), 
+		.cmd_out_get_i      (cmd_out_get_i     ), 
+		.cmd_out_rsp        (cmd_out_rsp       ), 
+		.cmd_out_rsp_sz     (cmd_out_rsp_sz    ));
+	
 	assign demux2local_ready = (local_state != 4'b1000);
 	
 	always @(posedge uclock or posedge reset) begin
@@ -126,112 +172,42 @@ module tblink_rpc_ctrl(
 			cclock_div <= {32{1'b0}};
 			cclock_en_r <= 1'b0;
 			rsp_buf_cnt <= 4'b0000;
+			cmd_in_get_i <= 1'b0;
+			cmd_in_rsp <= {CMD_IN_RSP_SZ*8{1'b0}};
+			cmd_in_rsp_sz <= {8{1'b0}};
 		end else begin
-			// Shift in a new byte when enabled
-			if (req_buf_en) begin
-				for (req_buf_i=0; req_buf_i<5; req_buf_i=req_buf_i+1) begin
-					req_buf[req_buf_i] <= req_buf[req_buf_i+1];
-				end
-				req_buf[5] <= demux2local_dat;
-			end
-			case (local_state)
-				4'b0000: begin
-					if (demux2local_ready && demux2local_valid) begin
-						// Receive header
-						req_buf_cnt <= 5;
-						local_state <= 4'b0001;
+			if (cmd_in_put_i != cmd_in_get_i) begin
+				case (cmd_in)
+					8'd1: begin // GetTime
+						cmd_in_rsp_sz <= 8'd8;
+						cmd_in_rsp[63:0] <= cclock_count;
 					end
-				end
-				4'b0001: begin // Receive size
-					req_msg_size <= demux2local_dat[2:0];
-					local_state <= 4'b0010;
-				end
-				4'b0010: begin // Receive remainder of data
-					if (demux2local_ready & demux2local_valid) begin
-						if (req_msg_size == 0) begin
-							if (|req_buf_cnt) begin
-								// Need to handle balance of message shifts
-								local_state <= 4'b0011;
-							end else begin
-								// Shifts are complete
-								local_state <= 4'b0100;
-							end
-						end
-						req_buf_cnt <= req_buf_cnt - 1;
-						req_msg_size <= req_msg_size - 1;
-					end
-				end
-				4'b0011: begin // Handle remainder of buffer shifts
-					if (!(|req_buf_cnt)) begin
-						local_state <= 4'b0100;
-					end
-					req_buf_cnt <= req_buf_cnt-1;
-				end
-				4'b0100: begin // Handle the command
-					rsp_buf[0] <= 8'h00; // DST
-					// rsp_buf[1]: total payload size
-					rsp_buf[2] <= 8'h01; // RSP
-					rsp_buf[3] <= req_buf[1]; // ID
 					
-					case (req_buf[0][2:0])
-						3'b001: begin // GetTime
-							rsp_buf[1] <= 8'd10; // Total payload size-1
-							rsp_buf[4] <= cclock_count[7:0];
-							rsp_buf[5] <= cclock_count[15:8];
-							rsp_buf[6] <= cclock_count[23:16];
-							rsp_buf[7] <= cclock_count[31:24];
-							rsp_buf[8] <= cclock_count[39:32];
-							rsp_buf[9] <= cclock_count[47:40];
-							rsp_buf[10] <= cclock_count[55:48];
-							rsp_buf[11] <= cclock_count[63:56];
-							rsp_buf_cnt <= 11;
-						end
-						3'b010: begin // SetTimer
-						end
-						3'b011: begin // Release
-							// Re-enable clock
-							cclock_en_r <= 1'b1;
-							rsp_buf[1] <= 8'd01; // Total payload size-1
-							rsp_buf_cnt <= 3;
-						end
-						3'b100: begin // SetDivisor
-							cclock_div[7:0] <= req_buf[2];
-							cclock_div[15:8] <= req_buf[3];
-							cclock_div[23:16] <= req_buf[4];
-							cclock_div[31:24] <= req_buf[5];
-							rsp_buf[1] <= 8'd01; // Total payload size-1
-							rsp_buf_cnt <= 3;
-						end
-					endcase
-					for (rsp_buf_i=0; rsp_buf_i<6; rsp_buf_i=rsp_buf_i+1) begin
-						$display("rsp_buf[%0d] = 'h%02h", rsp_buf_i, rsp_buf[rsp_buf_i]);
+					8'd2: begin // SetTimer
+						// TODO:
+						cmd_in_rsp_sz <= 8'd0;
 					end
-					local_state <= 4'b1000; 
-				end
-				4'b1000: begin // Send response
-					if (local2mux_ready && local2mux_valid) begin
-						// Shift the message
-						for (rsp_buf_i=0; rsp_buf_i<11; rsp_buf_i=rsp_buf_i+1) begin
-							rsp_buf[rsp_buf_i] <= rsp_buf[rsp_buf_i+1];
-						end
-						if (rsp_buf_cnt == 4'b0000) begin
-							if (cclock_en_r) begin
-								local_state <= 4'b1001;
-							end else begin
-								local_state <= 4'b0000;
-							end
-						end
-						rsp_buf_cnt <= rsp_buf_cnt - 1'b1;
+					
+					8'd3: begin // Release
+						// Re-enable clock
+						cclock_en_r <= 1'b1;
+						
+						cmd_in_rsp_sz <= 8'd0;
 					end
-				end
-				4'b1001: begin // Waiting for an event
-					// TODO: timer
-					if (hreq_i) begin
-						cclock_en_r <= 1'b0;
-						local_state <= 4'b0000;
+					
+					8'd4: begin // SetDivisor
+						cclock_div <= cmd_in[31:0];
+						cmd_in_rsp_sz <= 8'd0;
 					end
-				end
-			endcase
+					
+					default: begin
+						// TODO?
+						cmd_in_rsp_sz <= 8'd0;
+					end
+						
+				endcase
+				cmd_in_get_i <= ~cmd_in_get_i;
+			end
 		end
 	end
 	

@@ -3,7 +3,7 @@ Created on Jan 14, 2022
 
 @author: mballance
 '''
-from tblink_rpc_gw.transport.msg_base import MsgBase
+from tblink_rpc_gw.msg_base import MsgBase
 
 class MsgCtrl(MsgBase):
     

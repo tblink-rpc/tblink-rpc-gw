@@ -21,7 +21,8 @@ module tblink_rpc_rvdemux #(parameter ADDR=0)(
 	reg[1:0] state;
 	assign i_ready = (|state & (
 				(sel_a&oa_ready)|(!sel_a & op_ready)));
-	assign oa_valid = (|state & sel_a & i_valid);
+	// Note: OA eats the packet header (addr) byte
+	assign oa_valid = (state[1] & sel_a & i_valid);
 	assign op_valid = (|state & !sel_a & i_valid);
 	assign oa_dat = i_dat;
 	assign op_dat = i_dat;
