@@ -82,8 +82,11 @@ module tblink_rpc_cmdproc #(
 			tipo_state == TIPO_DAT_RSP
 		);
 	assign tipo_rsp_valid = (
-			tipo_state == TIPO_EXEC_RSP
+			tipo_state == TIPO_WAIT_RSP_ACK
 		);
+	// True for one cycle when a cmd-in response
+	// is complete
+	wire cmd_in_rsp_done;
 
 	// TIPO State Machine
 	// - Receives both cmd-in-req and cmd-out-rsp
@@ -195,7 +198,9 @@ module tblink_rpc_cmdproc #(
 				
 				TIPO_WAIT_RSP_ACK: begin // Wait response from TIPI
 					// Back to the beginning?
-					tipo_state <= TIPO_COUNT;
+					if (cmd_in_rsp_done) begin
+						tipo_state <= TIPO_COUNT;
+					end
 				end
 				
 				TIPO_ID_RSP: begin // Capture id for response
@@ -260,6 +265,8 @@ module tblink_rpc_cmdproc #(
 	assign tipo_rsp_ready = (tipi_state == TIPI_CMD_RSP_5);
 	
 	assign cmd_out_get_i = cmd_out_get_i_r;
+	
+	assign cmd_in_rsp_done  = (tipi_state == TIPI_CMD_RSP_5);
 	
 	// TIPI State Machine
 	// - Muxes between cmd-rsp and cmd-out-req

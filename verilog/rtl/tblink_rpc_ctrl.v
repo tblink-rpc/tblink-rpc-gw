@@ -72,6 +72,13 @@ module tblink_rpc_ctrl(
 	reg[31:0]		cclock_div;
 	reg[31:0]		cclock_div_cnt;
 	
+	reg				cclock_timer_load_r;
+	reg				cclock_timer_load_a;
+	reg[31:0]		cclock_timer_cnt;
+	reg[31:0]		cclock_timer;
+	reg				cclock_timer_trig_r;
+	reg				cclock_timer_trig_a;
+	
 	assign cclock_en = (cclock_en_r & (cclock_div == cclock_div_cnt));
 
 	always @(posedge uclock or posedge reset) begin
@@ -79,12 +86,28 @@ module tblink_rpc_ctrl(
 			cclock_r <= 0;
 			cclock_div_cnt <= {32{1'b0}};
 			cclock_count <= {64{1'b0}};
+			cclock_timer <= {32{1'b0}};
+			cclock_timer_load_a <= 1'b0;
+			cclock_timer_trig_r <= 1'b0;
 		end else begin
+			if (cclock_timer_load_r != cclock_timer_load_a) begin
+				cclock_timer <= cclock_timer_cnt;
+				cclock_timer_load_a <= ~cclock_timer_load_a;
+			end
+			
 			if (cclock_en) begin
 				if (!cclock_r) begin
 					// Count rising clock edges
 					cclock_count <= cclock_count + 1'b1;
+					
+					if (cclock_timer != 0) begin
+						if (cclock_timer == 32'd1) begin
+							cclock_timer_trig_r <= ~cclock_timer_trig_r;
+						end
+						cclock_timer <= cclock_timer - 1;
+					end
 				end
+				
 				cclock_r <= ~cclock_r;
 				cclock_div_cnt <= {32{1'b0}};
 			end else begin
@@ -96,25 +119,6 @@ module tblink_rpc_ctrl(
 			end
 		end
 	end
-	
-	reg[3:0]		local_state;
-	
-	reg[7:0]		req_buf[5:0];
-	reg[2:0]		req_buf_cnt;
-	reg[2:0]		req_msg_size;
-	
-	reg[7:0]		rsp_buf[11:0];
-	reg[3:0]		rsp_buf_cnt;
-	
-	wire req_buf_en;
-//	assign demux2local_ready = (~local_state[3]);
-	assign req_buf_en = (
-			(!local_state[3] & demux2local_ready & demux2local_valid) ||
-			(local_state == 4'b0011));
-	assign local2mux_valid = (local_state == 4'b1000);
-	assign local2mux_dat = rsp_buf[0];
-	
-	integer req_buf_i, rsp_buf_i;
 	
 	localparam CMD_IN_PARAMS_SZ   = 8;
 	localparam CMD_IN_RSP_SZ      = 8;
@@ -162,19 +166,23 @@ module tblink_rpc_ctrl(
 		.cmd_out_rsp        (cmd_out_rsp       ), 
 		.cmd_out_rsp_sz     (cmd_out_rsp_sz    ));
 	
-	assign demux2local_ready = (local_state != 4'b1000);
+	reg cmd_out_state;
 	
 	always @(posedge uclock or posedge reset) begin
 		if (reset) begin
-			req_buf_cnt <= 4'b0000;
-			local_state <= 4'b0000;
-			req_msg_size <= 3'b000;
 			cclock_div <= {32{1'b0}};
 			cclock_en_r <= 1'b0;
-			rsp_buf_cnt <= 4'b0000;
 			cmd_in_get_i <= 1'b0;
 			cmd_in_rsp <= {CMD_IN_RSP_SZ*8{1'b0}};
 			cmd_in_rsp_sz <= {8{1'b0}};
+			cmd_out <= {8{1'b0}};
+			cmd_out_sz <= {8{1'b0}};
+			cmd_out_params <= {8*CMD_OUT_PARAMS_SZ{1'b0}};
+			cmd_out_put_i <= 1'b0;
+			cclock_timer_cnt <= {32{1'b0}};
+			cclock_timer_load_r <= 1'b0;
+			cclock_timer_trig_a <= 1'b0;
+			cmd_out_state <= 1'b0;
 		end else begin
 			if (cmd_in_put_i != cmd_in_get_i) begin
 				case (cmd_in)
@@ -185,6 +193,8 @@ module tblink_rpc_ctrl(
 					
 					8'd2: begin // SetTimer
 						// TODO:
+						cclock_timer_cnt <= cmd_in_params[31:0];
+						cclock_timer_load_r <= ~cclock_timer_load_r;
 						cmd_in_rsp_sz <= 8'd0;
 					end
 					
@@ -196,7 +206,7 @@ module tblink_rpc_ctrl(
 					end
 					
 					8'd4: begin // SetDivisor
-						cclock_div <= cmd_in[31:0];
+						cclock_div <= cmd_in_params[31:0];
 						cmd_in_rsp_sz <= 8'd0;
 					end
 					
@@ -208,6 +218,27 @@ module tblink_rpc_ctrl(
 				endcase
 				cmd_in_get_i <= ~cmd_in_get_i;
 			end
+			
+			case (cmd_out_state) 
+				1'b0: begin
+					if (cclock_timer_trig_a != cclock_timer_trig_r) begin
+						cmd_out_put_i <= ~cmd_out_put_i;
+						cclock_timer_trig_a <= ~cclock_timer_trig_a;
+						cmd_out <= 8'b1;
+
+						cmd_out_state <= 1'b1;
+					end else begin
+						// TODO:
+					end
+				end
+				
+				1'b1: begin
+					if (cmd_out_put_i == cmd_out_get_i) begin
+						cmd_out_state <= 1'b0;
+					end
+				end
+			endcase
+			
 		end
 	end
 	

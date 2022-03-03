@@ -22,10 +22,10 @@ class MsgCtrlFactory(object):
         ret.dst = 0
         ret.cmd = 0x02
         ret.id = req_id
-        ret.payload.append(((tval >>0) & 0xFF))
-        ret.payload.append(((tval >>8) & 0xFF))
-        ret.payload.append(((tval >>16) & 0xFF))
         ret.payload.append(((tval >>24) & 0xFF))
+        ret.payload.append(((tval >>16) & 0xFF))
+        ret.payload.append(((tval >>8) & 0xFF))
+        ret.payload.append(((tval >>0) & 0xFF))
         return ret
     
     @staticmethod
@@ -42,8 +42,8 @@ class MsgCtrlFactory(object):
         ret.dst = 0
         ret.cmd = 0x04
         ret.id = req_id
-        ret.payload.append(((div >>0) & 0xFF))
-        ret.payload.append(((div >>8) & 0xFF))
-        ret.payload.append(((div >>16) & 0xFF))
         ret.payload.append(((div >>24) & 0xFF))
+        ret.payload.append(((div >>16) & 0xFF))
+        ret.payload.append(((div >>8) & 0xFF))
+        ret.payload.append(((div >>0) & 0xFF))
         return ret
