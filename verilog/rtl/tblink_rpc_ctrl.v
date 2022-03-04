@@ -227,6 +227,9 @@ module tblink_rpc_ctrl(
 						cmd_out <= 8'b1;
 
 						cmd_out_state <= 1'b1;
+
+						// Halt clock
+						cclock_en_r <= 1'b0;
 					end else begin
 						// TODO:
 					end
