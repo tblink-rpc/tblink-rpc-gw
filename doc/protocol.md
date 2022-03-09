@@ -11,14 +11,43 @@ a message intended for itself, it consumes and does not forward.
 TIPs are permitted to insert messages at message boundaries, potentially
 introducing back-pressure in the network.
 
+# All Packets
+[7:0]   Dst
+[7:0]   Payload sz-1
+[...]   Payload
+
+# TB->Hw Requests
+[...]   Payload
+  [7:0] cmd
+  [7:0] id (to be returned with response)
+  [...] parameter data
+  
+# HW->TB Responses
+[...]   Payload
+  [7:0] cmd
+  [7:0] id (from request)
+  [...] parameter data
+
+# HW->TB Requests
+[...]
+  [7:0] cmd
+  [7:0] src -- address of EP originating the request
+  [...] parameter data
+
+# TB->HW Responses
+[...]
+  [7:0] cmd
+  [7:0] id (unused)
+  [...] parameter data
+  
 [Header]
   [7]     Type (1=req ; 0=rsp) -- ?
   [6:0]   Dst
-  
-  [7:0]   Payload sz (val+1)
+  [7:0]   Payload sz-1
 
 [Payload]
-  [...]   sz bytes
+  [7:0]   Src
+  [...]   sz-1 bytes
   
 - Response-type code
   - ACK: 0x01

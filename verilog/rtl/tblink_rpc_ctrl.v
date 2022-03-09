@@ -142,6 +142,7 @@ module tblink_rpc_ctrl(
 
 
 	tblink_rpc_cmdproc #(
+		.ADDR				(0					),
 		.CMD_IN_PARAMS_SZ   (CMD_IN_PARAMS_SZ   ), 
 		.CMD_IN_RSP_SZ      (CMD_IN_RSP_SZ      ), 
 		.CMD_OUT_PARAMS_SZ  (CMD_OUT_PARAMS_SZ  ), 
