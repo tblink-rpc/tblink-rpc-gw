@@ -266,11 +266,18 @@ module tblink_rpc_cmdproc #(
 						cmd_out_params_r <= cmd_out_params;
 					end else if (tipo_rsp_valid) begin
 						// TIPO requesting to send a response
-						tipi_dat_o <= {8{1'b0}}; // DST ID 0
-						tipi_state <= TIPI_CMD_RSP_1;
+						if (ADDR != 0) begin
+							tipi_dat_o <= {8{1'b0}}; // DST ID 0
+							tipi_state <= TIPI_CMD_RSP_1;
+						end else begin
+							// If we implement the controller, then do not
+							// send a destination address
+							tipi_dat_o <= cmd_in_rsp_sz + 8'd1;
+							tipi_state <= TIPI_CMD_RSP_2;
+						end
 					end
 				end
-				TIPI_CMD_RSP_1: begin 	
+				TIPI_CMD_RSP_1: begin
 					// Wait for DST ack
 					if (tipi_valid && tipi_ready) begin
 						// Send SZ (data+2-1)

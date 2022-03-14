@@ -27,6 +27,7 @@ class Endpoint(trc.EndpointBase):
         self._req_id = 1
         self._rsp_m = {}
         self._simtime = 0
+        self._addr_ifinst_m = {}
         pass
     
     def is_init(self) -> int:
@@ -49,11 +50,13 @@ class Endpoint(trc.EndpointBase):
             else:
                 ifinst.peer = self._peer_interface_inst_m[ifinst.name()]
                 ifinst.addr = self._peer_interface_inst_m[ifinst.name()].addr
+                self._addr_ifinst_m[ifinst.addr] = ifinst
         
         # Check that we have expected local instances
         for ifinst in self._peer_interface_inst_l:
             if ifinst.name() not in self._local_interface_inst_m.keys():
                 raise Exception("Missing local interface inst %s" % ifinst.name())
+            
             
         return 1
     
@@ -154,6 +157,7 @@ class Endpoint(trc.EndpointBase):
         In many cases, the Endpoint implementation simply delegates 
         to the underlying transport.
         """
+        print("--> process_one_message", flush=True)
         
         pkt = None
         try:
@@ -163,12 +167,12 @@ class Endpoint(trc.EndpointBase):
             print("id=%d cmd=%d payload=%s" % (pkt.id, pkt.cmd, str(pkt.payload)))
             
             if pkt.cmd == 0:
-                print("TODO: Handle as a response")
+                print("TODO: Handle as a response", flush=True)
                 if pkt.id in self._rsp_m.keys():
                     self._rsp_m[pkt.id](pkt)
                     self._rsp_m.pop(pkt.id)
             else:
-                print("TODO: Handle as a request")
+                print("TODO: Handle as a request", flush=True)
                 if pkt.id == 0:
                     # This is a request from ctrl
                     if pkt.cmd == 1:
@@ -191,15 +195,24 @@ class Endpoint(trc.EndpointBase):
                                 0, self._cb_l[0][0]))
                             
                     else:
-                        print("TODO: handle ctrl request %d" % pkt.cmd)
+                        print("TODO: handle ctrl request %d" % pkt.cmd, flush=True)
                     pass
                 else:
                     # This is a request from one of the connected EPs
-                    pass
+                    print("Request to addr=%d" % pkt.id)
+                    if pkt.id not in self._addr_ifinst_m.keys():
+                        print("TbLink Error: destination id %d not present" % pkt.id)
+                        raise Exception("TbLink Error: destination id %d not present" % pkt.id)
+                    params = []
+                    self._addr_ifinst_m[pkt.id]._invoke_req(
+                        pkt.cmd,
+                        params,
+                        lambda rv: self._ifinst_invoke_rsp(0, rv))
                 
         except Exception as e:
             traceback.print_exc()
 
+        print("<-- process_one_message", flush=True)
         return 1
     
     def _send(self, pkt, rsp_f=None):
@@ -237,5 +250,33 @@ class Endpoint(trc.EndpointBase):
                        
         print("time: %d" % time)
         return time
+    
+    def _ifinst_invoke(self,
+                       ifinst,
+                       method_t,
+                       params,
+                       completion_f):
+        # TODO: form a message packet to send to the controller
+        payload = [1, 2, 3, 4, 5, 6, 7, 8]
+        print("addr=%s cmd=%s payload=%s" % (str(ifinst.addr), str(method_t.id()), str(payload)))
+        pkt = MsgBfmCmd(ifinst.addr, 0, method_t.id(), payload)
+        self._send(pkt, lambda pkt: self._invoke_rsp(pkt, completion_f))
+        
+        # TODO: process messages waiting for response
+        
+        pass
+    
+    def _invoke_rsp(self, pkt, completion_f):
+        rv = None
+        if len(pkt.payload) > 0:
+            # TODO: handle unpacking return value
+            print("TODO: unpack return value")
+        completion_f(rv)
+    
+    def _ifinst_invoke_rsp(self,
+                           id,
+                           rv):
+        print("TODO: _ifinst_invoke_rsp")
+        pass
     
     

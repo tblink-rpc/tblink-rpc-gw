@@ -17,9 +17,9 @@ class TestBackendTransport(object):
         raise NotImplementedError("send not implemented by %s" % str(type(self)))
     
     async def recv(self) -> MsgBase:
-        dst = await self.recv_b()
-                    
-        print("dst=%d" % dst)
+        print("--> TestBackendTransport::recv")
+#        dst = await self.recv_b()
+#        print("dst=%d" % dst)
                    
         # Receive size
         size = await self.recv_b()
@@ -36,6 +36,7 @@ class TestBackendTransport(object):
         rsp = MsgBfmCmd(0, payload[1], payload[0])
         rsp.payload.extend(payload[2:])        
    
+        print("<-- TestBackendTransport::recv")
         return rsp        
     
     async def recv_b(self) -> int:
